@@ -16,6 +16,7 @@ use wide::{f32x4, CmpGe, CmpLe, CmpLt};
 
 use crate::audio_path::{R3_FILTER, R3_VCA};
 use crate::control_path::{ControlCoeffs, CTRL_TAU_S};
+use crate::imperfection::{Imperfection, ImperfectionConfig, DEFAULT_SEED};
 use crate::oversample::{halfband_polyphase, halfband_taps};
 use crate::params::{Components, Mode, Params};
 use crate::vactrol::I_FLOOR_A;
@@ -23,6 +24,63 @@ use crate::vactrol::I_FLOOR_A;
 #[inline]
 fn splat(v: f32) -> f32x4 {
     f32x4::splat(v)
+}
+
+/// Per-lane salts that decorrelate the four voices' fingerprint seeds from one
+/// base seed. Lane 0 uses the base seed unchanged, so a four-voice instance's
+/// first voice matches a scalar `Lpg` built with the same seed.
+const LANE_SEED_SALT: [u64; 4] = [
+    0x0000_0000_0000_0000,
+    0x9E37_79B9_7F4A_7C15,
+    0xC2B2_AE3D_27D4_EB4F,
+    0x1656_67B1_9E37_79F9,
+];
+
+/// Derive lane `i`'s fingerprint seed from a base seed.
+#[inline]
+fn lane_seed(base: u64, i: usize) -> u64 {
+    base ^ LANE_SEED_SALT[i]
+}
+
+/// The tolerance-perturbed component values, packed per lane for the `f32x4`
+/// solve. Only the fields the imperfection layer can perturb live here; the rest
+/// of the operating point (`r3`, `drive`, the trapezoidal step) stays scalar and
+/// shared. When imperfection is disabled, every lane holds the nominal value, so
+/// this is just a splat of the base components and the math is unchanged.
+#[derive(Debug, Clone, Copy)]
+struct ComponentsX4 {
+    c1: f32x4,
+    c2: f32x4,
+    c3: f32x4,
+    rf_law_a: f32x4,
+    rf_law_b: f32x4,
+    r_on_min: f32x4,
+    r_off: f32x4,
+    tau_attack_s: f32x4,
+    tau_decay_s: f32x4,
+}
+
+impl ComponentsX4 {
+    /// All four lanes share one set of nominal components.
+    fn splat(c: &Components) -> Self {
+        Self::from_lanes(&[*c, *c, *c, *c])
+    }
+
+    /// Gather four per-lane `Components` into lane-packed vectors.
+    fn from_lanes(c: &[Components; 4]) -> Self {
+        let gather = |f: fn(&Components) -> f32| f32x4::from([f(&c[0]), f(&c[1]), f(&c[2]), f(&c[3])]);
+        Self {
+            c1: gather(|c| c.c1),
+            c2: gather(|c| c.c2),
+            c3: gather(|c| c.c3),
+            rf_law_a: gather(|c| c.rf_law_a),
+            rf_law_b: gather(|c| c.rf_law_b),
+            r_on_min: gather(|c| c.r_on_min),
+            r_off: gather(|c| c.r_off),
+            tau_attack_s: gather(|c| c.tau_attack_s),
+            tau_decay_s: gather(|c| c.tau_decay_s),
+        }
+    }
 }
 
 /// Numerically stable `tanh` on four lanes (argument clamped to avoid `exp`
@@ -86,8 +144,8 @@ impl ControlPathX4 {
     }
 
     #[inline]
-    fn process(&mut self, cv: f32x4, offset: f32) -> f32x4 {
-        let target = cv + splat(offset);
+    fn process(&mut self, cv: f32x4, offset: f32x4) -> f32x4 {
+        let target = cv + offset;
         self.cv_state = target + (self.cv_state - target) * splat(self.smooth);
         control_current_x4(&self.coeffs, self.cv_state)
     }
@@ -101,10 +159,10 @@ struct VactrolX4 {
 }
 
 impl VactrolX4 {
-    fn new(sample_rate: f32, comp: &Components) -> Self {
+    fn new(sample_rate: f32, comp: &ComponentsX4) -> Self {
         Self {
             sample_rate,
-            rf: splat(comp.r_off),
+            rf: comp.r_off,
         }
     }
 
@@ -112,22 +170,22 @@ impl VactrolX4 {
         self.sample_rate = sample_rate;
     }
 
-    fn reset(&mut self, comp: &Components) {
-        self.rf = splat(comp.r_off);
+    fn reset(&mut self, comp: &ComponentsX4) {
+        self.rf = comp.r_off;
     }
 
     #[inline]
-    fn process(&mut self, if_current: f32x4, comp: &Components) -> f32x4 {
+    fn process(&mut self, if_current: f32x4, comp: &ComponentsX4) -> f32x4 {
         let i_eff = if_current.max(splat(I_FLOOR_A));
-        let target = (splat(comp.rf_law_a) / i_eff.powf(1.4) + splat(comp.rf_law_b))
-            .max(splat(comp.r_on_min))
-            .min(splat(comp.r_off));
+        let target = (comp.rf_law_a / i_eff.powf(1.4) + comp.rf_law_b)
+            .max(comp.r_on_min)
+            .min(comp.r_off);
 
         let opening = target.cmp_lt(self.rf);
-        let mut tau = opening.blend(splat(comp.tau_attack_s), splat(comp.tau_decay_s));
+        let mut tau = opening.blend(comp.tau_attack_s, comp.tau_decay_s);
 
         let span = (comp.r_off / comp.r_on_min).ln();
-        let openness = ((splat(comp.r_off) / self.rf).ln() / splat(span))
+        let openness = ((comp.r_off / self.rf).ln() / span)
             .max(splat(0.0))
             .min(splat(1.0));
         tau *= splat(0.5) + splat(0.5) * (splat(1.0) - openness);
@@ -232,7 +290,9 @@ impl OversamplerX4 {
 }
 
 /// SIMD 292 cell: the 3-state Schur-complement solve on four lanes (mirror of the
-/// scalar `Cell292`). `rf` is per-lane; the rest of the operating point is shared.
+/// scalar `Cell292`). `rf`, the capacitor values, and resonance are per-lane (the
+/// imperfection layer perturbs them per voice); `r3`/`drive`/the trapezoidal step
+/// are shared. `c3_active` is the mode switch (C3 out in VCA), shared across lanes.
 #[derive(Debug, Clone)]
 struct Cell292X4 {
     f: f32,
@@ -242,10 +302,11 @@ struct Cell292X4 {
     xo: f32x4,
     rf: f32x4,
     r3: f32,
-    c1: f32,
-    c2: f32,
-    c3: f32,
-    resonance: f32,
+    c1: f32x4,
+    c2: f32x4,
+    c3: f32x4,
+    c3_active: bool,
+    resonance: f32x4,
     drive: f32,
 }
 
@@ -259,10 +320,11 @@ impl Cell292X4 {
             xo: splat(0.0),
             rf: splat(1.0e6),
             r3: R3_FILTER,
-            c1: 1.0e-9,
-            c2: 220.0e-12,
-            c3: 4.7e-9,
-            resonance: 0.0,
+            c1: splat(1.0e-9),
+            c2: splat(220.0e-12),
+            c3: splat(4.7e-9),
+            c3_active: true,
+            resonance: splat(0.0),
             drive: 1.0,
         }
     }
@@ -277,18 +339,19 @@ impl Cell292X4 {
     #[inline]
     fn solve_step(&mut self, x: f32x4) -> f32x4 {
         let (rf, c1, c2, c3, f, r3) = (self.rf, self.c1, self.c2, self.c3, self.f, self.r3);
+        let r3v = splat(r3);
 
-        let a1 = splat(1.0 / c1) / rf;
-        let a2 = -(splat(1.0) / rf + splat(1.0 / r3)) * splat(1.0 / c1);
-        let b1 = splat(1.0 / c2) / rf;
-        let b2 = splat(-2.0 / c2) / rf;
+        let a1 = splat(1.0) / (c1 * rf);
+        let a2 = -(splat(1.0) / rf + splat(1.0 / r3)) / c1;
+        let b1 = splat(1.0) / (rf * c2);
+        let b2 = splat(-2.0) / (rf * c2);
         let b3 = b1;
-        let b4 = splat(c3 / c2);
+        let b4 = c3 / c2;
         let d2 = splat(-1.0);
 
-        let d1 = if c3 > 0.0 {
-            let amax = (splat(2.0 * c1 * r3) + splat(c2 + c3) * (splat(r3) + rf)) / splat(c3 * r3);
-            splat(self.resonance.clamp(0.0, 1.0)) * amax
+        let d1 = if self.c3_active {
+            let amax = (splat(2.0) * c1 * r3v + (c2 + c3) * (r3v + rf)) / (c3 * r3v);
+            self.resonance.max(splat(0.0)).min(splat(1.0)) * amax
         } else {
             splat(0.0)
         };
@@ -322,7 +385,7 @@ impl Cell292X4 {
 
         self.sx += splat(2.0) * fv * (b1 * x + b2 * yx + b3 * yo + b4 * yd);
         self.so += splat(2.0) * fv * (a1 * yx + a2 * yo);
-        self.sd = if c3 > 0.0 {
+        self.sd = if self.c3_active {
             -(self.sd + splat(2.0 / f) * nl) - splat(2.0 / f) * (d1 * s2 * yo + d2 * yx)
         } else {
             splat(0.0)
@@ -334,11 +397,28 @@ impl Cell292X4 {
 }
 
 /// Four vactrol low-pass-gate voices processed together on `f32x4` lanes.
+///
+/// Each lane carries its own [`Imperfection`] instance (its own fingerprint seed,
+/// tolerance, drift, thermal wander and noise floor), so four polyphony voices are
+/// each a slightly different physical channel — the realistic analogue behaviour.
+/// The four seeds are derived from one base seed via [`lane_seed`], so the whole
+/// block is reproducible and serializable from a single seed, and lane 0 matches a
+/// scalar [`Lpg`](crate::Lpg) built with that base seed. The layer reuses the exact
+/// scalar `Imperfection` code, so each lane mirrors its scalar counterpart.
+///
+/// When imperfection is disabled (the default) the per-lane work is skipped
+/// entirely and the block runs the original shared/splat fast path.
 #[derive(Debug, Clone)]
 pub struct LpgX4 {
     sample_rate: f32,
     params: Params,
-    comp: Components,
+    base_seed: u64,
+    /// Nominal component values (before per-instance tolerance).
+    base_comp: Components,
+    /// Effective per-lane component values (tolerance applied when enabled).
+    compx4: ComponentsX4,
+    config: ImperfectionConfig,
+    imperfection: [Imperfection; 4],
     control: ControlPathX4,
     vactrol: VactrolX4,
     cell: Cell292X4,
@@ -347,17 +427,32 @@ pub struct LpgX4 {
 }
 
 impl LpgX4 {
+    /// Build four voices with the default fingerprint seed (imperfection disabled).
     pub fn new(sample_rate: f32) -> Self {
-        let comp = Components::default();
+        Self::with_seed(sample_rate, DEFAULT_SEED)
+    }
+
+    /// Build four voices whose per-lane seeds derive from `base_seed`.
+    pub fn with_seed(sample_rate: f32, base_seed: u64) -> Self {
+        let base_comp = Components::default();
+        let config = ImperfectionConfig::default();
+        let imperfection =
+            std::array::from_fn(|i| Imperfection::new(lane_seed(base_seed, i), config));
+        // Disabled config => every lane reports nominal components => a plain splat.
+        let compx4 = ComponentsX4::splat(&base_comp);
         Self {
             sample_rate,
             params: Params::default(),
-            comp,
+            base_seed,
+            base_comp,
+            compx4,
+            config,
+            imperfection,
             control: ControlPathX4::new(sample_rate),
-            vactrol: VactrolX4::new(sample_rate, &comp),
+            vactrol: VactrolX4::new(sample_rate, &compx4),
             cell: Cell292X4::new(),
             oversampler: OversamplerX4::new(),
-            last_rf: splat(comp.r_off),
+            last_rf: compx4.r_off,
         }
     }
 
@@ -375,6 +470,38 @@ impl LpgX4 {
         &self.params
     }
 
+    /// The base fingerprint seed; lane `i` uses [`lane_seed`]`(seed, i)`.
+    pub fn seed(&self) -> u64 {
+        self.base_seed
+    }
+
+    /// The four per-lane fingerprint seeds derived from the base seed. Building a
+    /// scalar [`Lpg`](crate::Lpg) with `lane_seeds()[i]` and the same imperfection
+    /// config reproduces lane `i` exactly.
+    pub fn lane_seeds(&self) -> [u64; 4] {
+        std::array::from_fn(|i| lane_seed(self.base_seed, i))
+    }
+
+    /// Configure the imperfection layer for all four lanes. Re-derives each lane's
+    /// component tolerance from its seed and resets the layers' transient state.
+    /// Mirrors [`Lpg::set_imperfection`](crate::Lpg::set_imperfection) per lane.
+    pub fn set_imperfection(&mut self, config: ImperfectionConfig) {
+        self.config = config;
+        for imp in &mut self.imperfection {
+            imp.config = config;
+            imp.reset();
+        }
+        let lanes: [Components; 4] =
+            std::array::from_fn(|i| self.imperfection[i].tolerance_components(&self.base_comp));
+        self.compx4 = ComponentsX4::from_lanes(&lanes);
+        self.last_rf = self.compx4.r_off;
+    }
+
+    /// The current imperfection configuration (shared across lanes).
+    pub fn imperfection_config(&self) -> &ImperfectionConfig {
+        &self.config
+    }
+
     /// Last per-lane vactrol resistance (ohms).
     pub fn last_rf(&self) -> [f32; 4] {
         self.last_rf.to_array()
@@ -382,34 +509,36 @@ impl LpgX4 {
 
     pub fn reset(&mut self) {
         self.control.reset();
-        self.vactrol.reset(&self.comp);
+        self.vactrol.reset(&self.compx4);
         self.cell.reset();
         self.oversampler.reset();
-        self.last_rf = splat(self.comp.r_off);
+        for imp in &mut self.imperfection {
+            imp.reset();
+        }
+        self.last_rf = self.compx4.r_off;
     }
 
-    /// Process one sample for all four voices. `audio_in`/`cv_in` are per-lane.
+    /// Set the cell operating point and run the (optionally oversampled) solve.
+    /// `resonance` is per-lane (drift perturbs it); the rest is shared.
     #[inline]
-    pub fn process(&mut self, audio_in: f32x4, cv_in: f32x4) -> f32x4 {
-        let current = self.control.process(cv_in, self.params.cv_offset);
-        let rf = self.vactrol.process(current, &self.comp);
-        self.last_rf = rf;
-
+    fn solve(&mut self, audio_in: f32x4, rf: f32x4, resonance: f32x4) -> f32x4 {
         let c = &mut self.cell;
         c.rf = rf.max(splat(1.0));
-        c.c1 = self.comp.c1;
-        c.c2 = self.comp.c2;
+        c.c1 = self.compx4.c1;
+        c.c2 = self.compx4.c2;
         match self.params.mode {
             Mode::Vca => {
-                c.c3 = 0.0;
+                c.c3 = splat(0.0);
+                c.c3_active = false;
                 c.r3 = R3_VCA;
             }
             _ => {
-                c.c3 = self.comp.c3;
+                c.c3 = self.compx4.c3;
+                c.c3_active = true;
                 c.r3 = R3_FILTER;
             }
         }
-        c.resonance = self.params.resonance;
+        c.resonance = resonance;
         c.drive = self.params.drive;
 
         let factor = self.params.oversample_factor();
@@ -420,6 +549,38 @@ impl LpgX4 {
             self.oversampler
                 .process(audio_in, factor, |xs| c.solve_step(xs))
         }
+    }
+
+    /// Process one sample for all four voices. `audio_in`/`cv_in` are per-lane.
+    #[inline]
+    pub fn process(&mut self, audio_in: f32x4, cv_in: f32x4) -> f32x4 {
+        if !self.config.enabled {
+            // Shared fast path: every lane identical, no per-lane gather.
+            let current = self.control.process(cv_in, splat(self.params.cv_offset));
+            let rf = self.vactrol.process(current, &self.compx4);
+            self.last_rf = rf;
+            return self.solve(audio_in, rf, splat(self.params.resonance));
+        }
+
+        // Per-lane path: each voice advances its own imperfection layer.
+        let mut res = [0.0f32; 4];
+        let mut off = [0.0f32; 4];
+        for (i, imp) in self.imperfection.iter_mut().enumerate() {
+            imp.update(self.sample_rate);
+            let p = imp.apply_params(&self.params);
+            res[i] = p.resonance;
+            off[i] = p.cv_offset;
+        }
+        let current = self.control.process(cv_in, f32x4::from(off));
+        let rf = self.vactrol.process(current, &self.compx4);
+        self.last_rf = rf;
+        let y = self.solve(audio_in, rf, f32x4::from(res));
+
+        let mut ya = y.to_array();
+        for (i, imp) in self.imperfection.iter_mut().enumerate() {
+            ya[i] = imp.apply_output(ya[i]);
+        }
+        f32x4::from(ya)
     }
 
     /// Convenience: process a block of per-lane samples in place.

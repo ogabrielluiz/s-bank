@@ -2,7 +2,7 @@
 //! within the tolerance of `wide`'s transcendental approximations, and the four
 //! lanes must stay independent (no cross-lane contamination).
 
-use vactrol_core::{Lpg, LpgX4, Mode, Params};
+use vactrol_core::{ImperfectionConfig, Lpg, LpgX4, Mode, Params};
 use wide::f32x4;
 
 const SR: f32 = 48_000.0;
@@ -121,6 +121,108 @@ fn simd_lanes_are_independent() {
             "lane {v} must equal its independent scalar voice: err={err:.2e}, peak={peak:.3}"
         );
     }
+}
+
+/// An imperfection config with everything on, so tolerance + drift + thermal +
+/// noise all exercise the per-lane SIMD path.
+fn imperfect_config() -> ImperfectionConfig {
+    ImperfectionConfig {
+        enabled: true,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn simd_lane_matches_scalar_with_imperfection() {
+    // With imperfection ON, each SIMD lane must mirror a scalar Lpg built with that
+    // lane's derived seed and the same config: the layer reuses the scalar code, so
+    // only wide's transcendental approximations should differ.
+    let n = SR as usize / 4;
+    let (audio, cv) = pluck_input(n);
+
+    let mut x4 = LpgX4::with_seed(SR, 0xDEAD_BEEF_1234_5678);
+    x4.set_params(params());
+    x4.set_imperfection(imperfect_config());
+    let lane_seeds = x4.lane_seeds();
+
+    let simd: Vec<[f32; 4]> = (0..n)
+        .map(|i| {
+            x4.process(f32x4::splat(audio[i]), f32x4::splat(cv[i]))
+                .to_array()
+        })
+        .collect();
+
+    for lane in 0..4 {
+        // Reference: a scalar voice seeded identically to this lane.
+        let mut s = Lpg::with_seed(SR, lane_seeds[lane]);
+        s.set_params(params());
+        s.set_imperfection(imperfect_config());
+        let scalar: Vec<f32> = audio
+            .iter()
+            .zip(&cv)
+            .map(|(&a, &c)| s.process_sample(a, c))
+            .collect();
+
+        let lane_out: Vec<f32> = simd.iter().map(|s| s[lane]).collect();
+        let err = max_abs_err(&scalar, &lane_out);
+        let peak = scalar.iter().map(|x| x.abs()).fold(0.0, f32::max);
+        assert!(
+            err < 1.0e-3 * peak.max(1.0),
+            "imperfect lane {lane} should match its scalar seed-mate: err={err:.2e}, peak={peak:.3}"
+        );
+    }
+}
+
+#[test]
+fn simd_imperfection_makes_lanes_differ() {
+    // Distinct per-lane fingerprints mean the four voices are NOT bit-identical even
+    // when fed the same input (the whole point of per-lane imperfection).
+    let n = SR as usize / 8;
+    let (audio, cv) = pluck_input(n);
+
+    let mut x4 = LpgX4::with_seed(SR, 0x0102_0304_0506_0708);
+    x4.set_params(params());
+    x4.set_imperfection(imperfect_config());
+
+    let simd: Vec<[f32; 4]> = (0..n)
+        .map(|i| {
+            x4.process(f32x4::splat(audio[i]), f32x4::splat(cv[i]))
+                .to_array()
+        })
+        .collect();
+
+    let lane0: Vec<f32> = simd.iter().map(|s| s[0]).collect();
+    for lane in 1..4 {
+        let other: Vec<f32> = simd.iter().map(|s| s[lane]).collect();
+        let diff = max_abs_err(&lane0, &other);
+        assert!(
+            diff > 1.0e-5,
+            "lane {lane} should differ from lane 0 under per-lane imperfection (diff={diff:.2e})"
+        );
+    }
+}
+
+#[test]
+fn simd_imperfection_is_deterministic() {
+    // Same base seed => identical four-lane output across independent runs.
+    let n = SR as usize / 8;
+    let (audio, cv) = pluck_input(n);
+
+    let run = || {
+        let mut x4 = LpgX4::with_seed(SR, 0xABCD_0123_4567_89EF);
+        x4.set_params(params());
+        x4.set_imperfection(imperfect_config());
+        (0..n)
+            .map(|i| {
+                x4.process(f32x4::splat(audio[i]), f32x4::splat(cv[i]))
+                    .to_array()
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let a = run();
+    let b = run();
+    assert_eq!(a, b, "same seed must produce identical output");
 }
 
 #[test]

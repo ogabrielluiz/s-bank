@@ -56,7 +56,11 @@ this; the DC-divider identity was verified numerically against `R3/(R3+2·Rf)`.
 - **SIMD voice block** (`simd.rs`, `LpgX4`): four voices on `wide::f32x4`, a
   line-for-line mirror of the scalar DSP (verified to match within 1e-3 in
   `tests/simd.rs`). 16 voices cost ~0.73 ms vs ~2.4 ms scalar in the bench, a
-  ~3.3x throughput gain. Imperfection is not yet applied on this path.
+  ~3.3x throughput gain. Imperfection is applied per lane: each of the four voices
+  carries its own `Imperfection` instance (seed derived from one base seed), so the
+  polyphony voices are each a slightly different physical channel. Lane `i` mirrors
+  a scalar `Lpg` with the same derived seed (`tests/simd.rs`); when imperfection is
+  disabled the block runs the original shared/splat fast path.
 - **Phase 6**: tiered CI live in `.github/workflows/` (smoke/pr/nightly/release);
   rationale in `docs/CI.md`. Done.
 - **Phase 7**: VCV adapter builds and links against the Rack v2 SDK on
