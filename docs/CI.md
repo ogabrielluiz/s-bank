@@ -4,12 +4,14 @@
 > (`smoke.yml`, `pr.yml`, `nightly.yml`, `release.yml`) — those files are the
 > source of truth. This document is the design rationale and tier reference.
 >
-> Two things were corrected versus the original draft so the committed CI is
+> Three things were corrected versus the original draft so the committed CI is
 > actually green: `smoke` runs the existing fast tests
 > (`stability` / `no_alloc` / `vactrol_envelope`) rather than a non-existent
-> `smoke` test, and `pr`'s bench-gate is a dependency-free `cargo bench --no-run`
+> `smoke` test; `pr`'s bench-gate is a dependency-free `cargo bench --no-run`
 > compile check until a CodSpeed `criterion-compat` shim is added (then the
-> instruction-count + wall-clock gate below becomes opt-in).
+> instruction-count + wall-clock gate below becomes opt-in); and the fast-math
+> matrix uses `-Cllvm-args=-fp-contract=fast` (the `-ffast-math` in the draft is a
+> clang flag that `rustc` rejects).
 
 The core principle (Part D of the report): **the DSP core has no VCV Rack SDK
 dependency**, so the entire test and bench suite runs headless. No core job
@@ -23,8 +25,10 @@ Tiers:
   sweeps, trend tracking.
 - **release** (tag): build/package the staticlib/cdylib artifacts.
 
-The matrix covers x86-64 and aarch64, and `-ffast-math` on/off (fast-math
-reordering breaks denormal handling and bit-reproducibility, so both are tested).
+The matrix covers x86-64 and aarch64, and FP contraction on/off
+(`-Cllvm-args=-fp-contract=fast`): FMA contraction reorders rounding and breaks
+bit-reproducibility, so both are tested. (Note: `-ffast-math` is a C/clang flag,
+not a rustc flag — `rustc` rejects it; fp-contract is the stable-rustc knob.)
 
 ## `.github/workflows/smoke.yml`
 
@@ -37,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
-        fastmath: ["", "-Cllvm-args=-fp-contract=fast -ffast-math"]
+        fastmath: ["", "-Cllvm-args=-fp-contract=fast"]
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: ${{ matrix.fastmath }}
@@ -68,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fastmath: ["", "-Cllvm-args=-fp-contract=fast -ffast-math"]
+        fastmath: ["", "-Cllvm-args=-fp-contract=fast"]
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: ${{ matrix.fastmath }}

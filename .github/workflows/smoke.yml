@@ -6,7 +6,10 @@ jobs:
       fail-fast: false
       matrix:
         target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
-        fastmath: ["", "-Cllvm-args=-fp-contract=fast -ffast-math"]
+        # `-ffast-math` is a C/clang flag, not a rustc flag (rustc rejects it).
+        # `-Cllvm-args=-fp-contract=fast` is the stable-rustc knob for FP
+        # contraction (FMA), which is what affects bit-reproducibility here.
+        fastmath: ["", "-Cllvm-args=-fp-contract=fast"]
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: ${{ matrix.fastmath }}

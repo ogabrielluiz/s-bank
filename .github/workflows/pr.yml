@@ -7,7 +7,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fastmath: ["", "-Cllvm-args=-fp-contract=fast -ffast-math"]
+        # See smoke.yml: `-ffast-math` is not a rustc flag; fp-contract is the
+        # stable knob that affects FP reproducibility.
+        fastmath: ["", "-Cllvm-args=-fp-contract=fast"]
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: ${{ matrix.fastmath }}
