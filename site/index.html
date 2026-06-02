@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAM-e / S- — Signal System</title>
+<link rel="stylesheet" href="css/system.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/sections.css">
+</head>
+<body>
+
+<!-- ===================== NAV ===================== -->
+<nav class="nav">
+  <span class="brand">Sam<span class="h">-</span>e</span>
+  <div class="links">
+    <a href="#identity">Identity</a>
+    <a href="#system">S- System</a>
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#balance">Balance</a>
+    <a href="#voice">Voice</a>
+    <a href="#live">Live</a>
+  </div>
+  <div class="status"><span class="led"></span> SIGNAL&nbsp;STABLE</div>
+</nav>
+
+<!-- ===================== INTRO ===================== -->
+<section id="intro" data-screen-label="Intro">
+  <canvas class="scope-bg" data-scope data-mode="wave" data-color="#FF5A00"></canvas>
+  <div class="crosshair tl"></div>
+  <div class="crosshair tr"></div>
+  <div class="wrap inner">
+    <div class="boot" id="bootlog"></div>
+    <div class="hero-mark">Sam<span class="h" data-drift="">-</span>e</div>
+    <div class="tagline" style="margin-top:22px; display:flex; gap:26px; flex-wrap:wrap; font-family:var(--mono); font-size:13px; letter-spacing:.16em; color:var(--d-dim); text-transform:uppercase;">
+      <span>Signals.</span><span>Rhythms.</span><span>Connections.</span>
+    </div>
+  </div>
+  <div class="scrollcue">↓ &nbsp; SCROLL TO DECODE</div>
+</section>
+
+<!-- ===================== IDENTITY ===================== -->
+<section id="identity" class="sec">
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">00 / IDENTITY</span>
+      <h2>One signal,<br>infinite interpretation.</h2>
+      <span class="sub">Sam-e is the artist. S- is the signal. The rest is interpretation.</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1.1fr .9fr; gap:0; border:1px solid var(--line);">
+      <div class="rise" style="padding:54px; border-right:1px solid var(--line);">
+        <div class="wordmark" style="font-size:clamp(56px,9vw,128px);">Sam<span class="h" data-drift="">-</span>e</div>
+        <p style="max-width:40ch; color:var(--gray); margin:28px 0 0;">The hyphen is not punctuation. It is a <b style="color:var(--paper-ink)">connector</b> — the live patch cable between the human and the machine. It is always reaching for what comes next.</p>
+      </div>
+      <div class="rise" style="padding:54px; display:flex; flex-direction:column; justify-content:space-between; gap:40px;">
+        <div class="smark" data-cycle="S" style="font-size:clamp(80px,12vw,150px);"></div>
+        <div>
+          <div style="font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1;">S<span class="hyph">-</span> is the constant.</div>
+          <div style="font-family:var(--display); font-weight:600; font-size:26px; line-height:1.1; color:var(--orange);">You are the variable.</div>
+          <p style="color:var(--gray); margin-top:14px; font-size:13px;">Hover the mark — same signal, different mode.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="readout rise" style="margin-top:0; border-top:0;">
+      <div>NAME&nbsp;&nbsp;<b>Sam-e</b></div>
+      <div>AKA&nbsp;&nbsp;<b>Samy</b></div>
+      <div>MARK&nbsp;&nbsp;<b>S-</b></div>
+      <div>SYSTEM&nbsp;&nbsp;<b>S-OS v0.3</b></div>
+      <div>STATUS&nbsp;&nbsp;<b style="color:var(--orange)">TRANSMITTING</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== S- SYSTEM ===================== -->
+<section id="system" class="sec" style="padding-top:0;">
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">01 / THE S- FAMILY</span>
+      <h2>Multiple modes.<br>One identity.</h2>
+      <span class="sub">Same glyph. Different state. The mark cycles like a module switching function.</span>
+    </div>
+    <div class="modegrid rise">
+      <div><div class="m">S<span class="glyph">-</span></div><div class="lbl">Core signal</div><div class="meta">source · identity</div></div>
+      <div><div class="m">S<span class="glyph">~</span></div><div class="lbl">Audio mode</div><div class="meta">waveform · oscillation</div></div>
+      <div><div class="m">S<span class="glyph">&gt;</span></div><div class="lbl">Execution</div><div class="meta">command · build</div></div>
+      <div><div class="m">S<span class="glyph">:</span></div><div class="lbl">Control</div><div class="meta">clock · gate · sync</div></div>
+      <div><div class="m">S<span class="glyph">•</span></div><div class="lbl">Status</div><div class="meta">active · monitor</div></div>
+    </div>
+    <p class="rise" style="margin-top:22px; color:var(--gray); font-size:13px; max-width:60ch;">Modes are texture, never a logo zoo. In any single context, <b style="color:var(--paper-ink)">commit to one</b>. The system reads as a faction, not a feature.</p>
+  </div>
+</section>
+
+<!-- ===================== COLOR = STATE ===================== -->
+<section id="color" class="sec dark" data-screen-label="Color">
+  <div class="crosshair tl"></div><div class="crosshair tr"></div>
+  <div class="wrap" id="colorstage">
+    <div class="s-head rise">
+      <span class="idx">02 / COLOR = STATE</span>
+      <h2>Color is not<br>decoration.</h2>
+      <span class="sub">Use color like a synth uses voltage. Different colors are different signals — never a rainbow.</span>
+    </div>
+
+    <div class="colorgrid rise">
+      <button data-state="orange" class="on" onclick="setSignalState('orange',this)">
+        <span class="sw" style="background:#FF5A00"></span><span class="nm">Orange · Signal</span>
+      </button>
+      <button data-state="yellow" onclick="setSignalState('yellow',this)">
+        <span class="sw" style="background:#FFC400"></span><span class="nm">Yellow · Energy</span>
+      </button>
+      <button data-state="cyan" onclick="setSignalState('cyan',this)">
+        <span class="sw" style="background:#19D2E5"></span><span class="nm">Cyan · Information</span>
+      </button>
+      <button data-state="eblue" onclick="setSignalState('eblue',this)">
+        <span class="sw" style="background:#1C46FF"></span><span class="nm">Electric Blue · Depth</span>
+      </button>
+    </div>
+
+    <div class="stage-readout rise">
+      <div class="left">
+        <div style="display:flex; align-items:center; gap:10px;"><span class="swatch-dot"></span><span class="tag">CURRENT STATE</span></div>
+        <div class="big sig-name">SIGNAL</div>
+        <div class="sig-mean" style="font-size:14px; color:var(--d-ink);">active / alive / transmitting</div>
+        <div style="margin-top:auto;"><span class="tag" style="display:block; margin-bottom:6px;">USED FOR</span><span class="sig-use" style="font-size:12.5px; color:var(--d-dim);">S- · status · important marks</span></div>
+      </div>
+      <div class="right">
+        <canvas class="sig-canvas" data-scope data-mode="wave" data-color="#FF5A00"></canvas>
+      </div>
+    </div>
+    <p class="rise" style="margin-top:20px; color:var(--d-dim); font-size:13px;">Black & white are the environment — silence, structure, space. Color only appears when the signal changes.</p>
+  </div>
+</section>
+
+<!-- ===================== TYPE ===================== -->
+<section id="type" class="sec">
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">03 / TYPOGRAPHY</span>
+      <h2>Human + machine.</h2>
+      <span class="sub">Space Grotesk speaks. Fira Code executes. Clarity, system, rhythm.</span>
+    </div>
+    <div class="grid rise" style="grid-template-columns:1fr 1fr;">
+      <div>
+        <span class="tag">DISPLAY — THE HUMAN</span>
+        <div class="disp" style="font-weight:700; font-size:clamp(46px,7vw,92px); line-height:.95; letter-spacing:-.03em; margin:18px 0 8px;">Space<br>Grotesk</div>
+        <div class="disp" style="font-size:20px; color:var(--gray);">AaBbCc 0123 — emotion, culture, voice</div>
+      </div>
+      <div>
+        <span class="tag">MONO — THE MACHINE</span>
+        <div class="mono" style="font-weight:600; font-size:clamp(34px,5vw,64px); line-height:1; margin:18px 0 14px;">Fira Code</div>
+        <pre class="mono" style="margin:0; color:var(--gray); font-size:13px; line-height:1.8;">01 def transmit(signal):
+02   while True:
+03     <span style="color:var(--orange)">sync</span>(signal)
+04     <span style="color:var(--orange)">send</span>(signal)
+05     repeat()</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BALANCE 70/20/10 ===================== -->
+<section id="balance" class="sec" style="padding-top:0;">
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">04 / THE 70·20·10 RULE</span>
+      <h2>Balance keeps it<br>human.</h2>
+      <span class="sub">Technical, and timeless. The technical world supports the art — it is not the subject.</span>
+    </div>
+    <div class="ratio rise">
+      <div>
+        <div class="pct">70</div><div class="bar" style="background:var(--paper-ink)"></div>
+        <div class="tag" style="color:var(--paper-ink)">ELECTRONIC ARTIST</div>
+        <p style="color:var(--gray); font-size:13px; margin:10px 0 0;">emotion, culture, typography, motion, imperfection, human.</p>
+      </div>
+      <div>
+        <div class="pct" style="color:var(--cyan)">20</div><div class="bar" style="background:var(--cyan)"></div>
+        <div class="tag" style="color:var(--cyan)">TECHNICAL SYSTEMS</div>
+        <p style="color:var(--gray); font-size:13px; margin:10px 0 0;">signals, data, waveforms, UI, precision, structure.</p>
+      </div>
+      <div>
+        <div class="pct" style="color:var(--orange)">10</div><div class="bar" style="background:var(--orange)"></div>
+        <div class="tag" style="color:var(--orange)">COLOR EMOTION</div>
+        <p style="color:var(--gray); font-size:13px; margin:10px 0 0;">warmth, energy, light, intensity, feeling.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== VOICE ===================== -->
+<section id="voice" class="sec dark" data-screen-label="Voice">
+  <div class="crosshair tl"></div><div class="crosshair tr"></div>
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">05 / VOICE</span>
+      <h2>Wordplay is<br>the message.</h2>
+      <span class="sub">Not products. Moments in time. Signals in motion. Same thing again — but never the same.</span>
+    </div>
+    <div class="posters rise">
+      <div class="poster"><div class="big" style="color:var(--orange)">SAME OLD STUFF.</div><div class="foot"><span>Sam-e</span><span class="smark" data-cycle="S"></span></div></div>
+      <div class="poster"><div class="big" style="color:var(--yellow)">YOU HAVE HEARD THIS BEFORE.</div><div class="foot"><span>Sam-e</span><span class="smark" data-cycle="S"></span></div></div>
+      <div class="poster"><div class="big" style="color:var(--cyan)">REPEATING IS NOT COPYING.</div><div class="foot"><span>Sam-e</span><span class="smark" data-cycle="S"></span></div></div>
+      <div class="poster"><div class="big" style="color:var(--eblue)">THE SAME FOUR BARS FOREVER.</div><div class="foot"><span>Sam-e</span><span class="smark" data-cycle="S"></span></div></div>
+    </div>
+    <p class="rise" style="margin-top:26px; font-family:var(--display); font-weight:600; font-size:clamp(20px,2.4vw,30px);">Repetition is not the enemy. Repetition is <span style="color:var(--orange)">evolution</span>.</p>
+  </div>
+</section>
+
+<!-- ===================== LIVE SYSTEM ===================== -->
+<section id="live" class="sec dark" style="padding-top:0;" data-screen-label="Live">
+  <div class="wrap">
+    <div class="s-head rise">
+      <span class="idx">06 / S- LIVE SYSTEM</span>
+      <h2>Signal acquired.</h2>
+      <span class="sub">Source: SAM-e · Mode: LIVE · Sequence 001 · Tempo 128.0</span>
+    </div>
+
+    <div class="rise" style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;">
+      <div class="card"><span class="corner">S-OS</span><div class="tag" style="margin-bottom:8px;">AUDIO MODE</div><canvas data-scope data-mode="wave" data-color="#FF5A00" style="width:100%;height:46px;display:block;"></canvas></div>
+      <div class="card"><span class="corner">CLOCK</span><div class="disp" style="font-size:32px; color:var(--yellow);">128.0</div><div class="tag">BPM</div></div>
+      <div class="card"><span class="corner">SEQ</span><canvas data-scope data-mode="data" data-color="#19D2E5" style="width:100%;height:46px;display:block;"></canvas><div class="tag" style="margin-top:8px;">SEQUENCE 001</div></div>
+      <div class="card"><span class="corner">SIGNAL</span><div class="disp" style="font-size:32px; color:var(--cyan);">-12.4<span style="font-size:16px"> dB</span></div><div class="tag">STATUS · ACTIVE</div></div>
+    </div>
+
+    <div class="rise" style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; align-items:center; border:1px solid var(--d-line); padding:26px;">
+      <div class="tag" style="text-align:center;">INIT</div>
+      <div class="tag" style="text-align:center;">WAVE</div>
+      <div class="tag" style="text-align:center;">CLOCK</div>
+      <div class="tag" style="text-align:center;">SEQUENCE</div>
+      <div class="tag" style="text-align:center;">DATA</div>
+      <canvas data-scope data-mode="wave" data-color="#FF5A00" style="grid-column:1/-1; width:100%; height:90px; display:block;"></canvas>
+    </div>
+
+    <div class="readout rise" style="margin-top:14px;">
+      <div>LOG 000237</div><div>TIME 23:48:12</div><div>SOURCE <b>SAM-e</b></div><div>MESSAGE <b style="color:var(--cyan)">SIGNAL STABLE</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="dark" style="padding:60px 0 80px; border-top:1px solid var(--d-line);">
+  <div class="wrap" style="display:flex; align-items:flex-end; justify-content:space-between; gap:40px; flex-wrap:wrap;">
+    <div>
+      <div class="smark" data-cycle="S" style="font-size:64px;"></div>
+      <div class="tag" style="margin-top:14px;">SAME SIGNAL. DIFFERENT DESTINATION.</div>
+    </div>
+    <div class="tag" style="text-align:right; line-height:2;">S-OS v0.3 — LIVING DOCUMENT<br>SAM-e · SIGNALS · RHYTHMS · CONNECTIONS</div>
+  </div>
+</footer>
+
+<script src="js/signal.js"></script>
+</body>
+</html>

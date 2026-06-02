@@ -1,0 +1,80 @@
+/* ============================================================
+   SAM-e / S-  —  components, motifs, dark frame
+   ============================================================ */
+
+/* ---------- nav ---------- */
+.nav{
+  position:fixed; top:0; left:0; right:0; z-index:60;
+  display:flex; align-items:center; gap:20px;
+  padding:14px var(--gutter);
+  background:rgba(245,245,241,.82); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  transition:background .5s, border-color .5s, color .5s;
+}
+.nav .brand{ font-family:var(--display); font-weight:700; font-size:18px; letter-spacing:-.02em; }
+.nav .brand .h{ color:var(--orange); }
+.nav .links{ margin-left:auto; display:flex; gap:2px; }
+.nav .links a{
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  text-decoration:none; padding:7px 12px; color:var(--gray);
+  border:1px solid transparent; border-radius:2px; transition:.2s;
+}
+.nav .links a:hover{ color:var(--orange); border-color:var(--line); }
+
+.nav.on-dark{ background:rgba(11,8,11,.78); border-color:var(--d-line); color:var(--d-ink); }
+.nav.on-dark .links a{ color:var(--d-dim); }
+.nav.on-dark .links a:hover{ color:var(--orange); border-color:var(--d-line); }
+.nav.on-dark .status{ color:var(--d-dim); }
+.nav .status{
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em; color:var(--gray);
+  display:flex; align-items:center; gap:7px;
+}
+.nav .status .led{
+  width:7px; height:7px; border-radius:50%; background:var(--orange);
+  box-shadow:0 0 0 0 rgba(255,90,0,.6); animation:pulse 2.4s infinite;
+}
+@keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(255,90,0,.55)} 70%{box-shadow:0 0 0 7px rgba(255,90,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,90,0,0)} }
+
+/* ---------- dark frame ---------- */
+.dark{ background:var(--d-bg); color:var(--d-ink); }
+.dark .s-head{ border-color:var(--d-line); }
+.dark .s-head .sub{ color:var(--d-dim); }
+.dark .readout{ border-color:var(--d-line); color:var(--d-dim); }
+.dark .readout > div{ border-color:var(--d-line); }
+.dark .readout b{ color:var(--d-ink); }
+.dark .crosshair::before,.dark .crosshair::after{ background:var(--d-line2); }
+
+/* ---------- mark / wordmark ---------- */
+.wordmark{ font-family:var(--display); font-weight:700; letter-spacing:-.03em; line-height:.9; }
+.wordmark .h{ color:var(--orange); }
+
+.smark{
+  font-family:var(--display); font-weight:700; line-height:1;
+  display:inline-flex; align-items:baseline;
+}
+.smark .glyph{ color:var(--orange); transition:.18s; }
+
+/* ---------- buttons / chips ---------- */
+.chip{
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  padding:8px 13px; border:1px solid var(--line-strong); border-radius:2px;
+  background:transparent; color:inherit; cursor:pointer; transition:.18s;
+}
+.chip:hover{ border-color:var(--orange); color:var(--orange); }
+.chip.on{ background:var(--orange); border-color:var(--orange); color:#fff; }
+
+/* ---------- generic card ---------- */
+.card{ border:1px solid var(--line); padding:22px; position:relative; background:transparent; }
+.dark .card{ border-color:var(--d-line); }
+.card .corner{ position:absolute; top:8px; right:10px; font-family:var(--mono); font-size:10px; color:var(--gray); letter-spacing:.1em; }
+
+/* ---------- grids ---------- */
+.grid{ display:grid; gap:1px; background:var(--line); border:1px solid var(--line); }
+.dark .grid{ background:var(--d-line); border-color:var(--d-line); }
+.grid > *{ background:var(--paper); padding:24px; }
+.dark .grid > *{ background:var(--d-bg); }
+
+/* fade-in on scroll */
+.rise{ opacity:0; transform:translateY(18px); transition:opacity .7s, transform .7s; }
+.rise.in{ opacity:1; transform:none; }

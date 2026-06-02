@@ -1,0 +1,106 @@
+/* ============================================================
+   SAM-e / S-  —  Brand System (living document)
+   Color is not decoration. Color is state.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
+
+:root{
+  /* --- ENVIRONMENT (silence / structure / space) --- */
+  --paper:        #F5F5F1;   /* NASA white */
+  --paper-ink:    #0B080B;   /* jet black  */
+  --black:        #0B080B;
+  --white:        #F5F5F1;
+  --gray:         #A6A6A6;   /* mission gray */
+  --gray-soft:    #c9c9c4;
+  --line:         rgba(11,8,11,0.14);
+  --line-strong:  rgba(11,8,11,0.32);
+
+  /* --- SIGNAL STATES (use like voltage, never as rainbow) --- */
+  --orange: #FF5A00;   /* PRIMARY signal — active / alive / transmitting */
+  --yellow: #FFC400;   /* ENERGY — peak / intensity / discovery / emotion */
+  --cyan:   #19D2E5;   /* INFORMATION — data / comms / clarity / flow     */
+  --eblue:  #1C46FF;   /* DEPTH — electricity / unknown / night / digital */
+
+  /* dark-frame surfaces */
+  --d-bg:    #0B080B;
+  --d-panel: #100c10;
+  --d-line:  rgba(245,245,241,0.16);
+  --d-line2: rgba(245,245,241,0.28);
+  --d-ink:   #F5F5F1;
+  --d-dim:   #7d7d79;
+
+  --display: 'Space Grotesk', sans-serif;
+  --mono: 'Fira Code', 'IBM Plex Mono', monospace;
+
+  --maxw: 1320px;
+  --gutter: clamp(20px, 4vw, 64px);
+}
+
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; -webkit-font-smoothing:antialiased; }
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--paper-ink);
+  font-family:var(--mono);
+  font-size:15px;
+  line-height:1.55;
+  overflow-x:hidden;
+}
+
+/* ---------- type helpers ---------- */
+.mono{ font-family:var(--mono); }
+.disp{ font-family:var(--display); }
+.tag{
+  font-family:var(--mono);
+  font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--gray);
+}
+.tag-dot{ display:inline-flex; align-items:center; gap:.6em; }
+.hyph{ color:var(--orange); }
+
+h1,h2,h3,h4{ font-family:var(--display); font-weight:600; margin:0; line-height:1.02; }
+a{ color:inherit; }
+
+/* ---------- layout shell ---------- */
+.wrap{ max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter); }
+section{ position:relative; }
+
+.crosshair{
+  position:absolute; width:13px; height:13px; pointer-events:none;
+  opacity:.5;
+}
+.crosshair::before,.crosshair::after{
+  content:""; position:absolute; background:var(--line-strong);
+}
+.crosshair::before{ left:50%; top:0; width:1px; height:100%; transform:translateX(-.5px); }
+.crosshair::after{ top:50%; left:0; height:1px; width:100%; transform:translateY(-.5px); }
+.crosshair.tl{ top:var(--gutter); left:var(--gutter); }
+.crosshair.tr{ top:var(--gutter); right:var(--gutter); }
+
+/* ---------- section header ---------- */
+.s-head{
+  display:flex; align-items:baseline; gap:18px;
+  padding-bottom:18px; margin-bottom:46px;
+  border-bottom:1px solid var(--line);
+}
+.s-head .idx{
+  font-family:var(--mono); font-size:12px; letter-spacing:.2em;
+  color:var(--orange);
+}
+.s-head h2{ font-size:clamp(26px,3.4vw,42px); letter-spacing:-.01em; }
+.s-head .sub{ margin-left:auto; max-width:34ch; text-align:right; color:var(--gray); font-size:12.5px; }
+
+.sec{ padding:clamp(72px,11vh,150px) 0; }
+
+/* divider readout strip */
+.readout{
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:0; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--gray);
+}
+.readout > div{ padding:11px 18px; border-right:1px solid var(--line); white-space:nowrap; }
+.readout b{ color:var(--paper-ink); font-weight:500; }
+
+::selection{ background:var(--orange); color:#fff; }
