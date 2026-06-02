@@ -103,11 +103,15 @@ impl Default for Components {
             c1: 1.0e-9,
             c2: 220.0e-12,
             c3: 4.7e-9,
+            // R_alpha is unused by the state-space audio path (which uses R3); kept
+            // for reference. See docs/REFERENCES.md.
             r_alpha_both: 5.0e6,
             r_alpha_vca: 5.0e3,
-            // Fit to the VTL5C3 datasheet in Parker & D'Angelo.
-            rf_law_a: 3.464,
-            rf_law_b: 1136.212,
+            // Authors' exact fitted constants (If in amps, Rf in ohms). Valid over
+            // the ~5-40 mA operating range; the monomial over-predicts below ~3 mA
+            // (so does the real part). B is the floor resistance. See docs/REFERENCES.md.
+            rf_law_a: 3.464_591,
+            rf_law_b: 1136.213,
             r_on_min: 500.0,
             r_off: 10.0e6,
             // Between the datasheet extremes (~2.5 ms / ~35 ms) and the

@@ -18,25 +18,27 @@ audio in -----------------------------------------> audio_path (TPT 2-pole) --> 
   from Parker & D'Angelo.
 - **vactrol**: target resistance from the datasheet power law `Rf = A/If^1.4 + B`,
   followed by an asymmetric, state-dependent one-pole (fast attack, slow decay).
-- **audio_path**: a topology-preserving **nodal circuit model** of the 292-style
-  passive vactrol ladder (`Vin -Rf- n1 -Rf- n2`, shunt caps C1/C2, terminating Rα,
-  optional C3 bridge in Lowpass mode). Each capacitor is a trapezoidal companion
-  model (conductance `2C/T` plus a history current source); the two node voltages
-  come from a 2x2 modified-nodal-analysis solve per sample. The DC divider
-  `Rα/(Rα+2·Rf)` (Eq. 12) falls out of the solve exactly in all three modes.
-  Resonance is the Sallen-Key mechanism: the C1 return is a buffered, gained copy
-  of the output (`Vfb = K·f(Vout)`), so the buffer nonlinearity sits inside the
-  feedback loop; `K = 1 + 2·C2/C1` is the self-oscillation threshold. Modes select
-  Rα (5 MΩ Both/Lowpass, 5 kΩ VCA) and C3 engagement.
+- **audio_path**: the Parker & D'Angelo **3-capacitor state-space 292 model**,
+  ported from the authors' own reference code (see `docs/REFERENCES.md`). States
+  for C1/C2/C3; coefficients `a1=1/(C1 Rf)`, `a2=-(1/Rf+1/R3)/C1`,
+  `b1=b3=1/(Rf C2)`, `b2=-2/(Rf C2)`, `b4=C3/C2`, `d1=a`, `d2=-1`. The delay-free
+  loop is solved in closed form (the `Dx`/`Do`/`Dmas` Schur-complement factors);
+  the `tanh` resonance nonlinearity is linearised about the previous output. The
+  DC divider `R3/(R3+2·Rf)` falls out of the solve exactly. Resonance is the
+  feedback gain `a` clamped to the exact `amax`; C3 is switched out in VCA mode.
 
-## Why a companion-model solve and not a direct-form transfer function
+## Why the topology-preserving state-space and not a direct-form transfer function
 
 The direct-form bilinear transfer function collapses the three capacitor states
-to two and **diverges under fast modulation**. The companion-model MNA keeps all
-three states (one per cap), and its conductance matrix is passive, so the
-per-sample solve is unconditionally stable at any modulation rate with no cutoff
-clamp. `tests/stability.rs` guards this; the DC-divider identity is verified
-against Eq. 12 directly.
+to two and **diverges under fast modulation**. The state-space form keeps all
+three states (one per cap) and is solved as a stable delay-free loop, so it stays
+finite at any modulation rate with no cutoff clamp. `tests/stability.rs` guards
+this; the DC-divider identity was verified numerically against `R3/(R3+2·Rf)`.
+
+> Earlier revisions used a generic SVF, then a clean-room passive-ladder MNA
+> model. Both were replaced once the authors' actual reference code was located
+> (see `docs/REFERENCES.md`): the real 292 is the state-space cell above, with no
+> Sallen-Key stage.
 
 ## Status
 

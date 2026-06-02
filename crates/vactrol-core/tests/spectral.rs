@@ -1,12 +1,11 @@
-//! Phase 2/4 acceptance: aliasing from the nonlinear stage is reduced by
-//! oversampling + ADAA, and below a locked threshold for the recommended config.
+//! Aliasing from the in-loop resonance nonlinearity is reduced by oversampling the
+//! solve, and sits below a locked threshold for the recommended 2x config.
 //!
-//! Method: drive a full-scale sine hard into the buffer nonlinearity (VCA mode,
-//! gate open, high drive). The `tanh` generates odd harmonics; those above Nyquist
-//! fold back to inharmonic bins. We FFT a coherently-sampled steady-state segment
-//! (rectangular window, F0 on a bin), treat the ladder of true harmonics
-//! `k·f0 < fs/2` as wanted, and sum everything else (excluding DC) as aliasing.
-//! Reported relative to the fundamental.
+//! Method: drive a full-scale sine hard into a high-resonance Lowpass cell (the
+//! tanh lives in the resonance feedback loop). Its harmonics fold above Nyquist.
+//! We FFT a coherently-sampled steady-state segment (rectangular window, F0 on a
+//! bin), treat the ladder of true harmonics `k·f0 < fs/2` as wanted, and sum
+//! everything else (excluding DC) as aliasing, relative to the fundamental.
 
 use realfft::RealFftPlanner;
 use std::f32::consts::TAU;
@@ -16,16 +15,19 @@ const SR: f32 = 48_000.0;
 const N: usize = 16_384;
 const F0: f32 = 9_000.0; // high fundamental: folding is worst here
 
-/// Aliasing energy (dB relative to the fundamental) for a given config.
-fn aliasing_db(oversample: u8, adaa: bool) -> f32 {
+/// Aliasing energy (dB relative to the fundamental) for a given oversampling
+/// factor. The nonlinearity lives in the resonance feedback loop, so we drive a
+/// high-resonance Lowpass cell hard with a full-scale sine through a wide-open
+/// gate; the in-loop tanh generates harmonics that fold without oversampling.
+fn aliasing_db(oversample: u8) -> f32 {
     let mut lpg = Lpg::new(SR);
     lpg.set_params(Params {
-        mode: Mode::Vca, // bright corner: the buffer sees ~full-scale sine
-        resonance: 0.0,
+        mode: Mode::Lowpass,
+        resonance: 0.85,
         cv_offset: 0.0,
         drive: 5.0,
         oversample,
-        adaa,
+        adaa: true,
     });
 
     // Hold the gate open and let the envelope/filter settle before capturing.
@@ -89,33 +91,25 @@ fn aliasing_db(oversample: u8, adaa: bool) -> f32 {
 }
 
 #[test]
-fn oversampling_and_adaa_reduce_aliasing() {
-    let base = aliasing_db(1, false);
-    let adaa_only = aliasing_db(1, true);
-    let os2_adaa = aliasing_db(2, true);
-    let os4_adaa = aliasing_db(4, true);
-    println!(
-        "aliasing dB rel fundamental: 1x={base:.1}, 1x+ADAA={adaa_only:.1}, \
-         2x+ADAA={os2_adaa:.1}, 4x+ADAA={os4_adaa:.1}"
-    );
+fn oversampling_reduces_aliasing() {
+    let base = aliasing_db(1);
+    let os2 = aliasing_db(2);
+    let os4 = aliasing_db(4);
+    println!("aliasing dB rel fundamental: 1x={base:.1}, 2x={os2:.1}, 4x={os4:.1}");
 
-    // Each measure should improve on the naive baseline.
+    // Oversampling the in-loop nonlinear solve must reduce folded-back energy.
     assert!(
-        adaa_only < base - 3.0,
-        "ADAA should reduce aliasing vs baseline"
+        os2 < base - 6.0,
+        "2x should clearly beat 1x: {os2:.1} vs {base:.1}"
     );
-    assert!(
-        os2_adaa < base - 6.0,
-        "2x+ADAA should clearly beat baseline"
-    );
-    assert!(os4_adaa <= os2_adaa + 1.0, "4x should be no worse than 2x");
+    assert!(os4 < os2 - 2.0, "4x should beat 2x: {os4:.1} vs {os2:.1}");
 
-    // Locked regression bar for the recommended config (empirical). With the
-    // in-loop nonlinearity and the 61-tap halfband, 2x + ADAA measures ~ -61 dB
-    // rel fundamental on a 9 kHz full-scale tone at drive 5; -40 dB leaves ample
-    // headroom for platform variation while still catching real regressions.
+    // Locked regression bar for the recommended 2x config (empirical: ~-22 dB on
+    // this torture case -- full-scale 9 kHz into a resonance-0.85 cell at drive 5;
+    // typical use aliases far less). -18 dB leaves headroom for platform/SIMD
+    // variation while still catching real regressions.
     assert!(
-        os2_adaa < -40.0,
-        "2x+ADAA aliasing should sit below -40 dB, got {os2_adaa:.1}"
+        os2 < -18.0,
+        "2x aliasing should sit below -18 dB, got {os2:.1}"
     );
 }

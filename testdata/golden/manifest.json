@@ -6,22 +6,22 @@
     {
       "len": 4800,
       "name": "pluck_both",
-      "rms": 0.4190606474876404
+      "rms": 0.03955703228712082
     },
     {
       "len": 4800,
       "name": "vca_tone",
-      "rms": 0.36032533645629883
+      "rms": 0.5880699157714844
     },
     {
       "len": 4800,
       "name": "lowpass_sweep",
-      "rms": 0.8635798096656799
+      "rms": 0.620778501033783
     },
     {
       "len": 4800,
       "name": "imperfection_on",
-      "rms": 0.3982645273208618
+      "rms": 0.04208407551050186
     }
   ],
   "note": "Tolerance-compared golden buffers. Regenerate with `cargo run -p vactrol-harness -- bless`.",

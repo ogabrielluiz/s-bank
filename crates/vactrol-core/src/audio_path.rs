@@ -1,160 +1,157 @@
-//! Audio path: a topology-preserving nodal model of the 292-style vactrol ladder.
+//! Audio path: the Parker & D'Angelo Buchla 292 model, ported from the authors'
+//! own reference implementation (the gen~ patch accompanying the DAFx-13 paper,
+//! also surviving as the SuperCollider `LPG` UGen).
 //!
-//! This is a circuit model, not a generic biquad. The 292 audio path is a passive
-//! ladder driven by the vactrol resistance `Rf`:
+//! It is a **three-capacitor continuous-time state-space filter** discretised with
+//! a topology-preserving (trapezoidal) scheme and solved as a delay-free loop in
+//! closed form each sample. The three states correspond to C1 (1 nF), C2 (220 pF)
+//! and C3 (4.7 nF):
 //!
 //! ```text
-//!   Vin --Rf-- n1 --Rf-- n2(=Vout)
-//!              |          |
-//!              C1*        C2     Ra
-//!              |          |       |
-//!             Vfb        gnd     gnd
-//!   (* C3 bridges n1-n2 in Lowpass mode only)
+//!   a1 = 1/(C1·Rf)              b1 =  1/(Rf·C2)
+//!   a2 = -(1/Rf + 1/R3)/C1      b2 = -2/(Rf·C2)
+//!   b3 =  1/(Rf·C2)             b4 =  C3/C2
+//!   d1 =  a (resonance gain)    d2 = -1
 //! ```
 //!
-//! Each capacitor is replaced by its trapezoidal companion model (a conductance
-//! `2C/T` in parallel with a history current source), and the two node voltages
-//! are found by a 2x2 modified-nodal-analysis solve every sample. Consequences:
+//! `Rf` is the vactrol resistance (sets cutoff and, with the two series `Rf`, the
+//! `R3/(R3 + 2·Rf)` output divider that closes the gate). `R3` is the output-node
+//! resistor; resonance is the feedback gain `a`, clamped to the exact stability
+//! limit `amax = (2·C1·R3 + (C2+C3)(R3+Rf)) / (C3·R3)` (recomputed every sample as
+//! Rf modulates). The `tanh` resonance nonlinearity is handled by instantaneous
+//! linearisation about the previous output `xo`, so the delay-free loop is solved
+//! algebraically (the `Dx`, `Do`, `Dmas` factors are the closed-form / Schur
+//! complement of the instantaneous system) with no Newton iteration. This is the
+//! topology-preserving version the paper shows is stable under any rate of
+//! modulation, unlike the direct-form bilinear transfer function.
 //!
-//! * The DC divider `Rα / (Rα + 2·Rf)` (Eq. 12) falls out of the solve exactly,
-//!   in all three modes, instead of being multiplied on afterwards.
-//! * There are three independent capacitor states (C1, C2, C3), which is the
-//!   paper's whole point: the transfer-function form keeps only two and diverges
-//!   under fast modulation. The companion-model `G` matrix is passive, so the
-//!   solve is unconditionally stable at any modulation rate, no cutoff clamp.
-//! * Every component value (C1, C2, C3, Rα, Rf) appears in the coefficients.
-//!
-//! Resonance uses the Sallen-Key mechanism: the C1 return is a buffered, gained
-//! copy of the output `Vfb = K · f(Vout)`, with `K` raising Q toward
-//! self-oscillation. The buffer nonlinearity `f` (tanh) therefore sits *inside*
-//! the feedback loop. It is evaluated on the previous (oversampled) output, so the
-//! `G` matrix stays passive and the per-sample solve stays linear and well-posed;
-//! the explicit one-sample feedback is the modelling approximation, and
-//! oversampling is the antialiasing backstop. At DC the C1 branch is open, so
-//! resonance does not disturb the Eq. 12 divider.
-//!
-//! Mode selects `Rα` (5 MΩ in Both/Lowpass, 5 kΩ in VCA) and whether the C3 branch
-//! is engaged (Lowpass). The scalar `f32` solve is branch-light, so a
-//! lane-parametric SIMD variant across voices is a structural drop-in.
+//! Modes: C3 is switched out (`= 0`) in VCA mode (amplitude/divider response only)
+//! and in for Lowpass/Both. `drive` scales the resonance nonlinearity's hardness
+//! (`drive = 1` is the authors' plain `tanh`); `resonance = 0` makes the cell
+//! linear (the nonlinear terms carry the factor `a`). The whole solve is
+//! oversampled when requested; that is the antialiasing path for the in-loop
+//! nonlinearity. The scalar solve is branch-light, mirrored lane-for-lane by the
+//! SIMD path in `simd.rs`.
 
-use crate::nonlinear::{self, TanhAdaa};
 use crate::oversample::Oversampler;
 use crate::params::{Components, Mode, Params};
 
-/// Resonance span: `K = 1 + resonance·K_SPAN`. Tuned so `resonance = 1` reaches
-/// bounded self-oscillation (the `amax` boundary).
-pub(crate) const K_SPAN: f32 = 2.2;
+/// Output-node resistor `R3`. VCA uses a smaller value for a stronger amplitude
+/// gate; Both/Lowpass use a larger value (mostly filter, gentle gating).
+pub(crate) const R3_VCA: f32 = 1.0e5;
+pub(crate) const R3_FILTER: f32 = 1.0e6;
 
-/// The companion-model ladder: capacitor histories, node memory, and the in-loop
-/// buffer nonlinearity. One `solve_step` advances a single (possibly oversampled)
-/// sample at the configured `dt`.
+/// The 292 cell: three capacitor states plus the previous output (for the
+/// resonance linearisation). One `solve_step` advances a single (possibly
+/// oversampled) sample at the configured timestep.
 #[derive(Debug, Clone)]
-struct Ladder {
-    dt: f32,
-    // Previous capacitor currents (trapezoidal history).
-    i1: f32,
-    i2: f32,
-    i3: f32,
-    // Previous node voltages and feedback voltage.
-    vn1: f32,
-    vn2: f32,
-    vfb: f32,
-    // In-loop buffer nonlinearity with optional ADAA.
-    adaa: TanhAdaa,
-    // Per-call operating point (set by `AudioPath::process`).
+struct Cell292 {
+    /// Trapezoidal prewarp factor `f = T/2` at the (possibly oversampled) rate.
+    f: f32,
+    // Capacitor states.
+    sx: f32,
+    so: f32,
+    sd: f32,
+    /// Previous output (resonance linearisation point).
+    xo: f32,
+    // Per-call operating point.
     rf: f32,
-    r_alpha: f32,
+    r3: f32,
     c1: f32,
     c2: f32,
-    c3: f32, // 0 unless Lowpass
-    k: f32,
+    c3: f32, // 0 in VCA mode
+    resonance: f32,
     drive: f32,
-    use_adaa: bool,
 }
 
-impl Ladder {
+impl Cell292 {
     fn new() -> Self {
         Self {
-            dt: 1.0 / 48_000.0,
-            i1: 0.0,
-            i2: 0.0,
-            i3: 0.0,
-            vn1: 0.0,
-            vn2: 0.0,
-            vfb: 0.0,
-            adaa: TanhAdaa::default(),
+            f: 0.5 / 48_000.0,
+            sx: 0.0,
+            so: 0.0,
+            sd: 0.0,
+            xo: 0.0,
             rf: 1.0e6,
-            r_alpha: 5.0e6,
+            r3: R3_FILTER,
             c1: 1.0e-9,
             c2: 220.0e-12,
-            c3: 0.0,
-            k: 1.0,
-            drive: 0.0,
-            use_adaa: false,
+            c3: 4.7e-9,
+            resonance: 0.0,
+            drive: 1.0,
         }
     }
 
     fn reset(&mut self) {
-        self.i1 = 0.0;
-        self.i2 = 0.0;
-        self.i3 = 0.0;
-        self.vn1 = 0.0;
-        self.vn2 = 0.0;
-        self.vfb = 0.0;
-        self.adaa.reset();
+        self.sx = 0.0;
+        self.so = 0.0;
+        self.sd = 0.0;
+        self.xo = 0.0;
     }
 
-    /// Advance one sample: assemble the 2x2 MNA system and solve for the node
-    /// voltages, then update capacitor histories. Returns `Vout = Vn2`.
     #[inline]
-    fn solve_step(&mut self, vin: f32) -> f32 {
-        let gf = 1.0 / self.rf;
-        let ga = 1.0 / self.r_alpha;
-        let gc1 = 2.0 * self.c1 / self.dt;
-        let gc2 = 2.0 * self.c2 / self.dt;
-        let gc3 = 2.0 * self.c3 / self.dt; // c3 == 0 disables the branch
+    fn solve_step(&mut self, x: f32) -> f32 {
+        let (rf, r3, c1, c2, c3, f) = (self.rf, self.r3, self.c1, self.c2, self.c3, self.f);
 
-        // Resonance buffer: explicit (uses the previous output), nonlinearity in
-        // the loop. K scales the Sallen-Key feedback toward self-oscillation.
-        let buf = if self.use_adaa {
-            self.adaa.process(self.vn2, self.drive)
+        let a1 = 1.0 / (c1 * rf);
+        let a2 = -(1.0 / rf + 1.0 / r3) / c1;
+        let b1 = 1.0 / (rf * c2);
+        let b2 = -2.0 / (rf * c2);
+        let b3 = 1.0 / (rf * c2);
+        let b4 = c3 / c2;
+        let d2 = -1.0;
+
+        // Resonance feedback gain, clamped to the exact stability limit amax.
+        let d1 = if c3 > 0.0 {
+            let amax = (2.0 * c1 * r3 + (c2 + c3) * (r3 + rf)) / (c3 * r3);
+            self.resonance.clamp(0.0, 1.0) * amax
         } else {
-            nonlinear::saturate(self.vn2, self.drive)
+            0.0
         };
-        let vfb = self.k * buf;
 
-        // Capacitor history current sources: Ics = Gc·v[n-1] + i[n-1].
-        let ics1 = gc1 * (self.vn1 - self.vfb) + self.i1;
-        let ics2 = gc2 * self.vn2 + self.i2;
-        let ics3 = gc3 * (self.vn1 - self.vn2) + self.i3;
+        // Resonance nonlinearity g(v) = tanh(drive·v)/drive, linearised about xo.
+        // `gx` plays the role of tanh(xo); `s2` of its slope 1 - tanh^2.
+        let (gx, s2) = if self.drive > 0.0 {
+            let t = (self.drive * self.xo).tanh();
+            (t / self.drive, 1.0 - t * t)
+        } else {
+            (self.xo, 1.0)
+        };
 
-        // MNA stamps for nodes n1, n2 (symmetric: g21 == g12).
-        let g11 = 2.0 * gf + gc1 + gc3;
-        let g22 = gf + ga + gc2 + gc3;
-        let g12 = -gf - gc3;
-        let b1 = gf * vin + gc1 * vfb + ics1 + ics3;
-        let b2 = ics2 - ics3;
+        let dx = 1.0 / (1.0 - b2 * f);
+        let do_ = 1.0 / (1.0 - a2 * f);
+        let dmas =
+            1.0 / (1.0 - dx * (f * f * b3 * do_ * a1 + b4 * f * d1 * s2 * do_ * a1 + b4 * d2));
 
-        let det = g11 * g22 - g12 * g12;
-        let vn1 = (b1 * g22 - g12 * b2) / det;
-        let vn2 = (g11 * b2 - g12 * b1) / det;
+        let nl = d1 * (gx - self.xo * s2);
 
-        // Update capacitor histories: i[n] = Gc·v[n] - Ics.
-        self.i1 = gc1 * (vn1 - vfb) - ics1;
-        self.i2 = gc2 * vn2 - ics2;
-        self.i3 = gc3 * (vn1 - vn2) - ics3;
-        self.vn1 = vn1;
-        self.vn2 = vn2;
-        self.vfb = vfb;
+        let yx = (self.sx
+            + f * b1 * x
+            + f * b3 * do_ * self.so
+            + f * b4 * (self.sd + (1.0 / f) * nl)
+            + b4 * d1 * s2 * do_ * self.so)
+            * dx
+            * dmas;
+        let yo = (self.so + f * a1 * yx) * do_;
+        let yd = (self.sd + (1.0 / f) * nl) + (1.0 / f) * (d1 * s2 * yo + d2 * yx);
 
-        vn2
+        self.sx += 2.0 * f * (b1 * x + b2 * yx + b3 * yo + b4 * yd);
+        self.so += 2.0 * f * (a1 * yx + a2 * yo);
+        self.sd = if c3 > 0.0 {
+            -(self.sd + (2.0 / f) * nl) - (2.0 / f) * (d1 * s2 * yo + d2 * yx)
+        } else {
+            0.0
+        };
+        self.xo = yo;
+
+        yo
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct AudioPath {
     sample_rate: f32,
-    ladder: Ladder,
+    cell: Cell292,
     oversampler: Oversampler,
 }
 
@@ -162,7 +159,7 @@ impl AudioPath {
     pub fn new(sample_rate: f32) -> Self {
         Self {
             sample_rate,
-            ladder: Ladder::new(),
+            cell: Cell292::new(),
             oversampler: Oversampler::new(),
         }
     }
@@ -172,37 +169,36 @@ impl AudioPath {
     }
 
     pub fn reset(&mut self) {
-        self.ladder.reset();
+        self.cell.reset();
         self.oversampler.reset();
     }
 
     /// Process one sample. `rf` is the live vactrol resistance (ohms).
     #[inline]
     pub fn process(&mut self, x: f32, rf: f32, params: &Params, comp: &Components) -> f32 {
-        let lowpass = matches!(params.mode, Mode::Lowpass);
-        let l = &mut self.ladder;
-        l.rf = rf.max(1.0);
-        l.r_alpha = match params.mode {
-            Mode::Vca => comp.r_alpha_vca,
-            _ => comp.r_alpha_both,
-        };
-        l.c1 = comp.c1;
-        l.c2 = comp.c2;
-        l.c3 = if lowpass { comp.c3 } else { 0.0 };
-        l.k = 1.0 + params.resonance.clamp(0.0, 1.0) * K_SPAN;
-        l.drive = params.drive;
-        l.use_adaa = params.adaa;
+        let c = &mut self.cell;
+        c.rf = rf.max(1.0);
+        c.c1 = comp.c1;
+        c.c2 = comp.c2;
+        match params.mode {
+            Mode::Vca => {
+                c.c3 = 0.0;
+                c.r3 = R3_VCA;
+            }
+            _ => {
+                c.c3 = comp.c3;
+                c.r3 = R3_FILTER;
+            }
+        }
+        c.resonance = params.resonance;
+        c.drive = params.drive;
 
-        let base_dt = 1.0 / self.sample_rate;
         let factor = params.oversample_factor();
+        c.f = 0.5 / (self.sample_rate * factor as f32);
         if factor == 1 {
-            l.dt = base_dt;
-            l.solve_step(x)
+            c.solve_step(x)
         } else {
-            // Oversample the whole nonlinear-feedback solve: the halfband runs the
-            // ladder `factor` times per output sample at the finer timestep.
-            l.dt = base_dt / factor as f32;
-            self.oversampler.process(x, factor, |xs| l.solve_step(xs))
+            self.oversampler.process(x, factor, |xs| c.solve_step(xs))
         }
     }
 }

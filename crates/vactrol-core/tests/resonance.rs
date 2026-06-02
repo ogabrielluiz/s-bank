@@ -20,11 +20,13 @@ fn params(resonance: f32) -> Params {
     }
 }
 
-/// Energy in the tail after a brief excitation, with the gate held open.
-fn tail_energy(resonance: f32) -> f32 {
+/// Total ring energy following a brief excitation (gate held open). A more
+/// resonant cell rings longer, so it integrates more energy. Measured from just
+/// after the excitation over a generous window, so it captures decay *length*
+/// rather than the level at one late instant.
+fn ring_energy(resonance: f32) -> f64 {
     let mut lpg = Lpg::new(SR);
     lpg.set_params(params(resonance));
-    // Open the gate and settle.
     for _ in 0..(SR as usize / 4) {
         lpg.process_sample(0.0, CV_RES);
     }
@@ -32,27 +34,23 @@ fn tail_energy(resonance: f32) -> f32 {
     for i in 0..16 {
         lpg.process_sample(if i == 0 { 1.0 } else { 0.0 }, CV_RES);
     }
-    // Measure tail energy a little later (after a non-resonant filter would have
-    // rung down).
-    for _ in 0..(SR as usize / 20) {
-        lpg.process_sample(0.0, CV_RES);
-    }
+    // Integrate the whole decaying tail.
     let mut energy = 0.0f64;
-    for _ in 0..(SR as usize / 20) {
+    for _ in 0..(SR as usize / 4) {
         let y = lpg.process_sample(0.0, CV_RES);
         assert!(y.is_finite());
         energy += (y as f64) * (y as f64);
     }
-    energy as f32
+    energy
 }
 
 #[test]
 fn higher_resonance_rings_longer() {
-    let low = tail_energy(0.1);
-    let high = tail_energy(0.9);
+    let low = ring_energy(0.2);
+    let high = ring_energy(0.9);
     assert!(
         high > low * 4.0,
-        "higher resonance should sustain more tail energy: low={low:.3e}, high={high:.3e}"
+        "higher resonance should sustain more ring energy: low={low:.3e}, high={high:.3e}"
     );
 }
 
