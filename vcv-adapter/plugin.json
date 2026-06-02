@@ -1,10 +1,10 @@
 {
-  "slug": "ComplibVactrol",
-  "name": "Complib Vactrol",
+  "slug": "SBankVactrol",
+  "name": "S-Bank Vactrol",
   "version": "2.0.0",
   "license": "MIT OR Apache-2.0",
-  "brand": "Complib",
-  "author": "Complib",
+  "brand": "S-Bank",
+  "author": "Sam-e",
   "description": "Virtual-analog vactrol low-pass gate (Buchla 292 style), Rust DSP core.",
   "modules": [
     {

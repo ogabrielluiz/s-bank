@@ -1,8 +1,8 @@
-# Workspace for the vactrol low-pass gate virtual-analog vertical slice.
-#
-# The DSP lives in `vactrol-core`, a portable library that has no dependency on
-# the VCV Rack SDK so the whole test/bench pipeline runs headless. A thin C++
-# adapter (future `vcv-adapter/`) links the staticlib over a C ABI.
+# S-Bank — the signal bank: a virtual-analog DSP component library for VCV Rack
+# (part of the Sam-e / S- signal system). Each instrument is a portable Rust core
+# with no VCV Rack SDK dependency, so the whole test/bench pipeline runs headless;
+# a thin C++ adapter in `vcv-adapter/` links the staticlib over a C ABI. The first
+# instrument in the bank is the vactrol low-pass gate (`vactrol-core`).
 [workspace]
 resolver = "2"
 members = [
@@ -13,7 +13,7 @@ members = [
 [workspace.package]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ogabrielluiz/complib"
+repository = "https://github.com/ogabrielluiz/s-bank"
 
 # Keep dev/test builds debuggable but not glacial.
 [profile.dev]
