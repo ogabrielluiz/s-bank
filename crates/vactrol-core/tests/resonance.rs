@@ -5,9 +5,10 @@
 use vactrol_core::{Lpg, Mode, Params};
 
 const SR: f32 = 48_000.0;
-/// Partially-open gate: Rf ~ 49 kΩ puts the resonant frequency near 7 kHz, well
-/// in band. (A fully-open gate sits above Nyquist, so nothing would ring.)
-const CV_RES: f32 = 0.07;
+/// Partially-open gate (Rf ~ 49 kΩ) puts the resonant frequency near 7 kHz, well
+/// in band. (A fully-open gate sits above Nyquist, so nothing would ring.) With
+/// the authors' control circuit this corresponds to a control voltage near 7 V.
+const CV_RES: f32 = 7.0;
 
 fn params(resonance: f32) -> Params {
     Params {

@@ -12,10 +12,10 @@
 //! The imperfection layer is intentionally not applied in this path yet; the SIMD
 //! path targets the deterministic DSP core (the performance-critical part).
 
-use wide::{f32x4, CmpLt};
+use wide::{f32x4, CmpGe, CmpLe, CmpLt};
 
 use crate::audio_path::{R3_FILTER, R3_VCA};
-use crate::control_path::{CTRL_TAU_S, I_MAX_A, V_SCALE};
+use crate::control_path::{ControlCoeffs, CTRL_TAU_S};
 use crate::oversample::{halfband_polyphase, halfband_taps};
 use crate::params::{Components, Mode, Params};
 use crate::vactrol::I_FLOOR_A;
@@ -34,11 +34,38 @@ fn tanh4(x: f32x4) -> f32x4 {
     (e - splat(1.0)) / (e + splat(1.0))
 }
 
+/// The authors' control circuit on four lanes (mirror of `ControlCoeffs::current`),
+/// piecewise branches realised as masked `blend`s.
+#[inline]
+fn control_current_x4(c: &ControlCoeffs, vb: f32x4) -> f32x4 {
+    let vb = vb.max(splat(-10.0)).min(splat(50.0));
+    let ia = vb * splat(c.inv_r5) + splat(c.bias);
+
+    // V3: middle (cubic) branch plus the two saturating branches, selected by Ia.
+    let x = ia * splat(c.x_coeff);
+    let w = splat(c.k0) + x * (splat(c.k1) + x * (splat(c.k2) + x * splat(c.k3)));
+    let v3_mid = splat(c.v3_w) * w + splat(c.v3_ia) * ia;
+    let v3_low = splat(c.v3_ia) * ia;
+    let v3_sat = splat(c.v3_sat_const) - ia * splat(c.r6r7);
+    let v3 = ia.cmp_ge(splat(c.bound1)).blend(v3_sat, v3_mid);
+    let v3 = ia.cmp_le(splat(-c.bound1)).blend(v3_low, v3);
+
+    // If: four branches by ascending Ia thresholds.
+    let ifbound1 = splat(c.alpha) * (splat(c.ifmin) - splat(c.beta) * v3);
+    let if_mid = splat(c.beta) * v3 + ia * splat(c.inv_alpha);
+    let if_b3 = splat(c.ifb3_slope) * ia + splat(c.ifb3_const);
+    let r = ia.cmp_le(splat(c.ifbound3)).blend(if_b3, splat(c.ifmax));
+    let r = ia.cmp_le(splat(c.ifbound2)).blend(if_mid, r);
+    let r = ia.cmp_le(ifbound1).blend(splat(c.ifmin), r);
+    r.max(splat(c.ifmin)).min(splat(c.ifmax))
+}
+
 /// SIMD control path: smooth CV, then map to LED current (amps).
 #[derive(Debug, Clone)]
 struct ControlPathX4 {
     cv_state: f32x4,
     smooth: f32,
+    coeffs: ControlCoeffs,
 }
 
 impl ControlPathX4 {
@@ -46,6 +73,7 @@ impl ControlPathX4 {
         Self {
             cv_state: splat(0.0),
             smooth: (-1.0 / (CTRL_TAU_S * sample_rate)).exp(),
+            coeffs: ControlCoeffs::new(),
         }
     }
 
@@ -61,8 +89,7 @@ impl ControlPathX4 {
     fn process(&mut self, cv: f32x4, offset: f32) -> f32x4 {
         let target = cv + splat(offset);
         self.cv_state = target + (self.cv_state - target) * splat(self.smooth);
-        let vv = self.cv_state.max(splat(0.0));
-        splat(I_MAX_A) * (splat(1.0) - (-vv / splat(V_SCALE)).exp())
+        control_current_x4(&self.coeffs, self.cv_state)
     }
 }
 

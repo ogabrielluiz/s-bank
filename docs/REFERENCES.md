@@ -37,6 +37,13 @@ notes). Summary of what was confirmed, corrected, and what remains approximate.
   constants. The "5x at 1 mA vs datasheet" worry is not a bug: the monomial fit
   only holds over the 5-40 mA range the 292 actually drives; below ~3 mA both the
   fit and real parts (the datasheet's own "consult factory" caveat) misbehave.
+- **Control circuit (CV -> LED current)** is ported verbatim from the authors'
+  `lpg.cpp` (`LpgControlCircuit::process`): the bias stage, the cubic Lambert-W
+  approximation `w = k0 + k1 x + k2 x^2 + k3 x^3` (k0=146.8, k1=0.49202,
+  k2=4.1667e-4, k3=7.3915e-9) in the central branch, the saturating branches, and
+  the piecewise `If` clamp to `[10.1 uA, 40 mA]`. All resistor/op-amp constants
+  (R3, R5, R6, R7, R8, R9, alpha, beta, G, n, VT, Vs, ...) match the source. The
+  Rust port is checked against the reference values in a unit test (`control_path`).
 
 ## Where the model diverges (documented approximations, not bugs)
 
@@ -45,9 +52,11 @@ notes). Summary of what was confirmed, corrected, and what remains approximate.
   port uses fixed nominal `R3` per mode (`R3_FILTER = 1 MΩ`, `R3_VCA = 100 kΩ`)
   and drives `a` from `resonance`. The Both vs Lowpass musical distinction in the
   original is subtle and not fully reproduced.
-- **Control path (CV -> LED current).** The paper uses a Lambert-W model of the
-  LED/transistor control stage (cubic approximation in the code). This port uses a
-  simpler saturating curve fit; the Lambert-W front end is a documented upgrade.
+- **Control circuit front-panel controls.** The reference exposes `offset` and
+  `scale` knobs (they set the bias divider R1/R2 and R6). This port fixes them
+  (offset ~ 0 so the gate fully darkens at CV = 0, scale = 1); exposing them as
+  parameters is straightforward future work. The CV-to-Vb input scaling is 1:1
+  (a control voltage in volts), so the gate opens over roughly CV 7-11 V.
 - **Vactrol time constants.** The reference uses a specific state-dependent
   attack/decay smoother; this port uses a comparable asymmetric, state-dependent
   one-pole (attack ~5 ms, decay ~120 ms, between the VTL5C3 single-part 2.5/35 ms

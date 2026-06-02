@@ -39,13 +39,14 @@ fn gen() {
     });
 
     let n = (sr * 0.5) as usize; // 500 ms
-    let gate_samples = (sr * 0.005) as usize; // 5 ms gate
+                                 // Gate longer than the vactrol attack so it opens before it starts to decay.
+    let gate_samples = (sr * 0.03) as usize; // 30 ms gate
     let two_pi = std::f32::consts::TAU;
 
     let mut peak = 0.0f32;
     let mut peak_idx = 0usize;
     for i in 0..n {
-        let cv = if i < gate_samples { 8.0 } else { 0.0 };
+        let cv = if i < gate_samples { 10.0 } else { 0.0 };
         let audio = (two_pi * 220.0 * i as f32 / sr).sin();
         let y = lpg.process_sample(audio, cv);
         if y.abs() > peak {
