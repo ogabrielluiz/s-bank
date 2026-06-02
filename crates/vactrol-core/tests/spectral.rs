@@ -27,7 +27,6 @@ fn aliasing_db(oversample: u8) -> f32 {
         cv_offset: 0.0,
         drive: 5.0,
         oversample,
-        adaa: true,
     });
 
     // Hold the gate open and let the envelope/filter settle before capturing.

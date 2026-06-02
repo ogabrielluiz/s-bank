@@ -14,7 +14,6 @@ fn params() -> Params {
         cv_offset: 0.0,
         drive: 1.5,
         oversample: 2,
-        adaa: true,
     }
 }
 
@@ -133,7 +132,6 @@ fn simd_stays_finite_on_pathological_input() {
         cv_offset: 0.0,
         drive: 4.0,
         oversample: 4,
-        adaa: true,
     });
     for i in 0..SR as usize {
         let t = i as f32 / SR;

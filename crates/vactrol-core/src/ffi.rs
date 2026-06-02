@@ -46,12 +46,11 @@ pub unsafe extern "C" fn vactrol_lpg_set_sample_rate(ptr: *mut Lpg, sample_rate:
 }
 
 /// Set runtime parameters. `mode`: 0 = Both, 1 = VCA, 2 = Lowpass.
-/// `oversample`: 1, 2, or 4. `adaa`: 0 = off, nonzero = on.
+/// `oversample`: 1, 2, or 4.
 ///
 /// # Safety
 /// `ptr` must be a valid instance pointer or null.
 #[no_mangle]
-#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn vactrol_lpg_set_params(
     ptr: *mut Lpg,
     mode: u32,
@@ -59,7 +58,6 @@ pub unsafe extern "C" fn vactrol_lpg_set_params(
     cv_offset: f32,
     drive: f32,
     oversample: u32,
-    adaa: u32,
 ) {
     if ptr.is_null() {
         return;
@@ -71,7 +69,6 @@ pub unsafe extern "C" fn vactrol_lpg_set_params(
             cv_offset,
             drive,
             oversample: oversample.min(4) as u8,
-            adaa: adaa != 0,
         });
     }));
 }

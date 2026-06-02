@@ -12,7 +12,6 @@ fn pluck_params() -> Params {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     }
 }
 
@@ -38,7 +37,6 @@ fn steady_rms(lpg: &mut Lpg) -> f32 {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     });
     let warmup = SR as usize / 4;
     let n = SR as usize / 4;

@@ -46,8 +46,6 @@ pub struct Params {
     pub drive: f32,
     /// Oversampling factor for the nonlinearity: 1, 2, or 4.
     pub oversample: u8,
-    /// Enable first-order ADAA on the buffer nonlinearity.
-    pub adaa: bool,
 }
 
 impl Default for Params {
@@ -58,7 +56,6 @@ impl Default for Params {
             cv_offset: 0.0,
             drive: 1.0,
             oversample: 2,
-            adaa: true,
         }
     }
 }

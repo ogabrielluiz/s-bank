@@ -19,7 +19,6 @@ fn finite_under_fast_modulation() {
             cv_offset: 0.0,
             drive: 4.0,
             oversample: 2,
-            adaa: true,
         });
 
         let n = SR as usize * 2;
@@ -68,7 +67,6 @@ fn pathological_inputs_stay_finite() {
             cv_offset: 0.0,
             drive: 2.0,
             oversample: 4,
-            adaa: true,
         });
         for i in 0..SR as usize {
             let (a, c) = f(i);

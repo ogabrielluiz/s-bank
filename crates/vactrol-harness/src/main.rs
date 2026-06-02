@@ -35,7 +35,6 @@ fn gen() {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     });
 
     let n = (sr * 0.5) as usize; // 500 ms

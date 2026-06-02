@@ -25,7 +25,6 @@ fn ir_cutoff(rf: f32) -> f32 {
         cv_offset: 0.0,
         drive: 0.0,
         oversample: 1,
-        adaa: false,
     };
     let mut ir = vec![0.0f32; N];
     for (i, s) in ir.iter_mut().enumerate() {

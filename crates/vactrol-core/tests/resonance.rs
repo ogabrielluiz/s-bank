@@ -17,7 +17,6 @@ fn params(resonance: f32) -> Params {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     }
 }
 

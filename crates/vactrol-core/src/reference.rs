@@ -43,7 +43,6 @@ fn render_pluck() -> Vec<f32> {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     });
     let gate = (SAMPLE_RATE * 0.005) as usize;
     (0..CASE_LEN)
@@ -63,7 +62,6 @@ fn render_vca_tone() -> Vec<f32> {
         cv_offset: 0.0,
         drive: 2.0,
         oversample: 2,
-        adaa: true,
     });
     (0..CASE_LEN)
         .map(|i| lpg.process_sample(sine(i, 1_000.0), 8.0))
@@ -79,7 +77,6 @@ fn render_lowpass_sweep() -> Vec<f32> {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     });
     (0..CASE_LEN)
         .map(|i| {
@@ -98,7 +95,6 @@ fn render_imperfection() -> Vec<f32> {
         cv_offset: 0.0,
         drive: 1.0,
         oversample: 2,
-        adaa: true,
     });
     lpg.set_imperfection(ImperfectionConfig {
         enabled: true,
