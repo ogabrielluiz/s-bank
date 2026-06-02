@@ -91,15 +91,8 @@ struct VactrolLPGWidget : ModuleWidget {
     VactrolLPGWidget(VactrolLPG* module) {
         setModule(module);
         setPanel(createPanel(asset::plugin(pluginInstance, "res/VactrolLPG.svg")));
-
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10, 20)), module, VactrolLPG::RESONANCE_PARAM));
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10, 40)), module, VactrolLPG::DRIVE_PARAM));
-        addParam(createParamCentered<CKSSThree>(mm2px(Vec(10, 60)), module, VactrolLPG::MODE_PARAM));
-        addParam(createParamCentered<CKSSThree>(mm2px(Vec(10, 75)), module, VactrolLPG::OVERSAMPLE_PARAM));
-
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8, 95)), module, VactrolLPG::AUDIO_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8, 108)), module, VactrolLPG::CV_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(8, 120)), module, VactrolLPG::AUDIO_OUTPUT));
+        // Generated from the panel spec (tools/panelgen) — single source of truth.
+#include "VactrolLPG_panel.inc"
     }
 };
 

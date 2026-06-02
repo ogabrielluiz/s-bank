@@ -115,26 +115,10 @@ struct StrikeWidget : ModuleWidget {
     StrikeWidget(Strike* module) {
         setModule(module);
         setPanel(createPanel(asset::plugin(pluginInstance, "res/Strike.svg")));
-
-        // Two mirrored channel columns about the 16HP centre line (40.64 mm).
-        const float cx[2] = {22.0f, 59.28f};
-        for (int ch = 0; ch < 2; ch++) {
-            float x = cx[ch];
-            int po = ch * 5;
-            int io = ch * 4;
-            addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(x, 18)), module, Strike::A_OPEN_PARAM + po));
-            addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(x, 36)), module, Strike::A_DECAY_PARAM + po));
-            addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(x, 54)), module, Strike::A_MATERIAL_PARAM + po));
-            addParam(createParamCentered<Trimpot>(mm2px(Vec(x - 8, 69)), module, Strike::A_DECAYCV_PARAM + po));
-            addParam(createParamCentered<Trimpot>(mm2px(Vec(x + 8, 69)), module, Strike::A_CTRLCV_PARAM + po));
-            addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(x, 80)), module, Strike::A_OPEN_LIGHT + ch));
-            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x - 9, 92)), module, Strike::A_IN_INPUT + io));
-            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x + 9, 92)), module, Strike::A_HIT_INPUT + io));
-            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x - 9, 105)), module, Strike::A_DECAY_INPUT + io));
-            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x + 9, 105)), module, Strike::A_CTRL_INPUT + io));
-            addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 118)), module, Strike::A_OUT_OUTPUT + ch));
-        }
-        addParam(createParamCentered<CKSS>(mm2px(Vec(40.64, 118)), module, Strike::IMPERFECTION_PARAM));
+        // Component placement is generated from the panel spec (tools/panelgen) so the
+        // SVG art and these positions can never drift. Regenerate: python3
+        // tools/panelgen/generate.py
+#include "Strike_panel.inc"
     }
 };
 
