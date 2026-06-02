@@ -79,6 +79,10 @@ def main() -> None:
             (RES / f"{p.module}{suffix}.svg").write_text(p.svg())
             print(f"  wrote res/{p.module}{suffix}.svg")
         print(f"  wrote src/{p.module}_panel.inc")
+    # Guardrail: fail loudly if any panel geometry is malformed (see check.py).
+    from check import check_all
+    if not check_all(RES):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,15 @@ from fontdata import FONTDATA
 
 _TOK = re.compile(r"[A-Za-z]|-?\d*\.?\d+(?:[eE][-+]?\d+)?")
 
+# Axis pattern per absolute path command (SVGPathPen emits M/L/H/V/Q/C/Z). H is a lone
+# x, V a lone y; the rest are x,y pairs. Honouring this is essential — treating H/V as
+# pairs scrambles every following coordinate.
+_AXIS = {
+    "M": "xy", "L": "xy", "T": "xy",
+    "Q": "xyxy", "S": "xyxy", "C": "xyxyxy",
+    "H": "x", "V": "y", "Z": "",
+}
+
 
 def _font(display: bool) -> dict:
     return FONTDATA["DISP"] if display else FONTDATA["MONO"]
@@ -33,17 +42,34 @@ def text_width(s: str, size: float, tracking: float = 0.0, display: bool = False
 
 
 def _placed(d: str, scale: float, tx: float, ty: float) -> str:
-    """Affine-transform every coordinate pair of an absolute path: uniform scale +
-    translate (no parsing of curve structure needed — all coords map the same way)."""
+    """Affine-transform an absolute SVG path (uniform scale + translate), command-aware
+    so H/V single-axis commands don't break x/y parity."""
+    toks = _TOK.findall(d)
     out: list[str] = []
-    i = 0
-    for tok in _TOK.findall(d):
-        if tok[0].isalpha():
-            out.append(tok)
-        else:
-            v = float(tok)
-            out.append(f"{(tx + scale * v):.3f}" if i % 2 == 0 else f"{(ty + scale * v):.3f}")
-            i += 1
+    cmd = "M"
+    j, n = 0, len(toks)
+
+    def xf(tok: str, axis: str) -> str:
+        v = float(tok)
+        return f"{(tx + scale * v):.3f}" if axis == "x" else f"{(ty + scale * v):.3f}"
+
+    while j < n:
+        t = toks[j]
+        if t[0].isalpha():
+            cmd = t.upper()
+            out.append(t)
+            j += 1
+            continue
+        pat = _AXIS.get(cmd, "xy")
+        if not pat:  # Z (or unknown) — no coords
+            out.append(t)
+            j += 1
+            continue
+        for axis in pat:  # one coordinate group; loop repeats for implicit repetition
+            if j >= n or toks[j][0].isalpha():
+                break
+            out.append(xf(toks[j], axis))
+            j += 1
     return " ".join(out)
 
 
