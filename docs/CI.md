@@ -1,9 +1,15 @@
 # Tiered CI design (Phase 6)
 
-> Note: the workflow YAML below is ready to drop into `.github/workflows/`, but it
-> is documented here rather than committed because the automation that created
-> this branch lacks the GitHub `workflows` permission and cannot push files under
-> `.github/workflows/`. Add these from an account/app with that permission.
+> Status: **live.** These workflows are committed under `.github/workflows/`
+> (`smoke.yml`, `pr.yml`, `nightly.yml`, `release.yml`) — those files are the
+> source of truth. This document is the design rationale and tier reference.
+>
+> Two things were corrected versus the original draft so the committed CI is
+> actually green: `smoke` runs the existing fast tests
+> (`stability` / `no_alloc` / `vactrol_envelope`) rather than a non-existent
+> `smoke` test, and `pr`'s bench-gate is a dependency-free `cargo bench --no-run`
+> compile check until a CodSpeed `criterion-compat` shim is added (then the
+> instruction-count + wall-clock gate below becomes opt-in).
 
 The core principle (Part D of the report): **the DSP core has no VCV Rack SDK
 dependency**, so the entire test and bench suite runs headless. No core job
@@ -47,7 +53,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo build --target ${{ matrix.target }}
-      - run: cargo test --test smoke --test stability --test no_alloc
+      - run: cargo test --test stability --test no_alloc --test vactrol_envelope
 ```
 
 ## `.github/workflows/pr.yml`
@@ -77,13 +83,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # CodSpeed simulation mode: deterministic instruction-count gating.
+      # Committed gate: dependency-free compile check of the benchmark target.
+      - run: cargo bench --bench lpg --no-run
+```
+
+Opt-in upgrade (requires adding `codspeed-criterion-compat` to the crate and a
+`CODSPEED_TOKEN` secret), giving deterministic instruction-count gating plus a
+same-runner wall-clock comparison for the SIMD/DSP throughput metric:
+
+```yaml
       - uses: CodSpeedHQ/action@v3
         with:
           run: cargo codspeed build && cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
-      # Plus a same-runner wall-clock relative comparison (base vs PR) for the
-      # throughput metric that instruction count cannot capture for SIMD/DSP.
 ```
 
 ## `.github/workflows/nightly.yml`

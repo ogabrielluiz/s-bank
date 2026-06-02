@@ -1,0 +1,13 @@
+name: nightly
+on:
+  schedule: [{ cron: "0 5 * * *" }]
+  workflow_dispatch:
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --release
+      - run: cargo bench --bench lpg   # trend tracking via CodSpeed/Bencher
