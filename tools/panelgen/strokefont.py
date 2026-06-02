@@ -2,14 +2,18 @@
 
 Rack renders SVGs with nanosvg, which does NOT draw `<text>` — only paths. So panel
 lettering must be vector geometry. This is a compact uppercase stroke font (A–Z, 0–9,
-space, ``-`` ``/`` ``.``) rendered as stroked polylines, which gives a clean engraved /
-plotter look that fits the Sam-e aerospace-instrument aesthetic. Self-contained: no
-font files, no dependencies, deterministic.
+space, ``-`` ``/`` ``.`` ``:``) rendered as stroked polylines, which gives a clean
+engraved / plotter look that fits the Sam-e aerospace-instrument aesthetic.
+Self-contained: no font files, no dependencies, deterministic.
 
 Grid per glyph: x ∈ [0,4], y ∈ [0,6] with y=0 at cap-top and y=6 at the baseline.
 """
 
 from __future__ import annotations
+
+# Global stroke-weight scale. A single-stroke font reads thin; this thickens every
+# glyph proportionally so panel lettering looks engraved rather than flimsy.
+WEIGHT_SCALE = 1.4
 
 # glyph -> (advance_units, [polyline, ...]) where polyline = [(x,y), ...]
 _F: dict[str, tuple[float, list[list[tuple[float, float]]]]] = {
@@ -17,6 +21,8 @@ _F: dict[str, tuple[float, list[list[tuple[float, float]]]]] = {
     "-": (4.6, [[(0.6, 3.0), (3.4, 3.0)]]),
     ".": (2.2, [[(1.7, 5.4), (2.1, 5.4), (2.1, 6.0), (1.7, 6.0), (1.7, 5.4)]]),
     "/": (4.6, [[(0.2, 6.0), (3.8, 0.0)]]),
+    ":": (2.2, [[(1.7, 1.6), (2.1, 1.6), (2.1, 2.2), (1.7, 2.2), (1.7, 1.6)],
+                [(1.7, 4.0), (2.1, 4.0), (2.1, 4.6), (1.7, 4.6), (1.7, 4.0)]]),
     "A": (4.8, [[(0, 6), (2, 0), (4, 6)], [(0.8, 3.9), (3.2, 3.9)]]),
     "B": (4.8, [[(0, 0), (0, 6)], [(0, 0), (2.8, 0.2), (3.4, 1.4), (2.6, 2.8), (0, 2.8)],
                 [(0, 2.8), (3.0, 3.1), (3.5, 4.4), (2.7, 5.8), (0, 6)]]),
@@ -27,7 +33,7 @@ _F: dict[str, tuple[float, list[list[tuple[float, float]]]]] = {
     "G": (5.0, [[(4, 1.1), (2.5, 0), (1, 0.4), (0, 2), (0, 4), (1, 5.6), (2.5, 6), (4, 5.6),
                  (4, 3.6), (2.4, 3.6)]]),
     "H": (4.8, [[(0, 0), (0, 6)], [(4, 0), (4, 6)], [(0, 3), (4, 3)]]),
-    "I": (2.4, [[(1, 0), (3, 0)], [(2, 0), (2, 6)], [(1, 6), (3, 6)]]),
+    "I": (3.8, [[(1.1, 0), (2.9, 0)], [(2, 0), (2, 6)], [(1.1, 6), (2.9, 6)]]),
     "J": (4.4, [[(3.2, 0), (3.2, 4.6), (2.2, 5.9), (1, 5.7), (0.4, 4.7)]]),
     "K": (4.8, [[(0, 0), (0, 6)], [(0, 3.4), (4, 0)], [(1.4, 2.4), (4, 6)]]),
     "L": (4.4, [[(0, 0), (0, 6), (4, 6)]]),
@@ -96,4 +102,4 @@ def text_paths(s: str, x: float, y: float, size: float, color: str,
     if not d_parts:
         return ""
     return (f'<path d="{" ".join(d_parts)}" fill="none" stroke="{color}" '
-            f'stroke-width="{weight:.2f}" stroke-linecap="round" stroke-linejoin="round"/>')
+            f'stroke-width="{weight * WEIGHT_SCALE:.2f}" stroke-linecap="round" stroke-linejoin="round"/>')
