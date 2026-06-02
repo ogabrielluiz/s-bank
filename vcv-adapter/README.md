@@ -4,10 +4,17 @@ A thin C++ `rack::Module` that links the Rust `vactrol-core` staticlib over the
 C ABI in `crates/vactrol-core/src/ffi.rs`. This is the **last, optional** phase:
 nothing here blocks the core pipeline, which builds and tests with no Rack SDK.
 
-> Status: scaffold. The C ABI header is generated and accurate, and the module
-> source is written against the Rack v2 API, but it is **not built or verified
-> here** because the Rack SDK and a Rack-targeting C++ toolchain are not present
-> in this environment. Treat it as a faithful skeleton, not a tested artifact.
+> Status: **builds.** Verified to compile and link against the Rack v2 SDK on
+> macOS/arm64 (Apple clang): `make RACK_DIR=/path/to/Rack-SDK` produces
+> `plugin.dylib`, statically linking `libvactrol_core.a` and exporting the Rack
+> `init` entry point plus the six `vactrol_lpg_*` C ABI functions. A loaded-in-Rack
+> runtime smoke test (audio through the gate) has not been scripted here; the
+> compile + link + symbol check is the verified deliverable. The link emits benign
+> `ld: warning: object file ... built for newer 'macOS' version` lines because the
+> Rust staticlib targets the host SDK while the Rack toolchain links at
+> `-mmacosx-version-min=10.9`; set `MACOSX_DEPLOYMENT_TARGET` when building the
+> core to silence them. Linux/Windows targets are untested (the README's
+> Rust-in-Rack linking caveats below still apply there).
 
 ## Layout
 

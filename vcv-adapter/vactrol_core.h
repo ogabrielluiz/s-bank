@@ -17,11 +17,6 @@
 #define DEFAULT_SEED 6215322990185237504
 
 /**
- * Ill-conditioning guard for the ADAA divided difference (in input units).
- */
-#define ADAA_EPS 1.0e-5
-
-/**
  * Halfband FIR length. Must satisfy `LEN ≡ 1 (mod 4)` so the centre index is
  * even and the even polyphase phase reduces to a pure delay. Longer gives a
  * sharper transition and deeper stopband (better alias rejection) at more cost.
@@ -78,7 +73,7 @@ void vactrol_lpg_set_sample_rate(struct Lpg *ptr, float sample_rate);
 
 /**
  * Set runtime parameters. `mode`: 0 = Both, 1 = VCA, 2 = Lowpass.
- * `oversample`: 1, 2, or 4. `adaa`: 0 = off, nonzero = on.
+ * `oversample`: 1, 2, or 4.
  *
  * # Safety
  * `ptr` must be a valid instance pointer or null.
@@ -88,8 +83,7 @@ void vactrol_lpg_set_params(struct Lpg *ptr,
                             float resonance,
                             float cv_offset,
                             float drive,
-                            uint32_t oversample,
-                            uint32_t adaa);
+                            uint32_t oversample);
 
 /**
  * Process one sample. Returns 0.0 on a null pointer or an (unexpected) panic.

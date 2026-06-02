@@ -2,3 +2,10 @@
 **/*.rs.bk
 *.pdb
 .DS_Store
+
+# VCV adapter build outputs
+/vcv-adapter/build/
+/vcv-adapter/dist/
+/vcv-adapter/plugin.dylib
+/vcv-adapter/plugin.so
+/vcv-adapter/*.vcvplugin

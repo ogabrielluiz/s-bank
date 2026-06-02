@@ -78,7 +78,7 @@ struct VactrolLPG : Module {
         uint32_t oversample = (osIndex == 0) ? 1 : (osIndex == 1) ? 2 : 4;
 
         for (int c = 0; c < channels; c++) {
-            vactrol_lpg_set_params(voices[c], mode, resonance, 0.f, drive, oversample, 1);
+            vactrol_lpg_set_params(voices[c], mode, resonance, 0.f, drive, oversample);
             float audio = inputs[AUDIO_INPUT].getPolyVoltage(c) / 5.f; // +-5V -> +-1
             float cv = inputs[CV_INPUT].getPolyVoltage(c);
             float y = vactrol_lpg_process_sample(voices[c], audio, cv);

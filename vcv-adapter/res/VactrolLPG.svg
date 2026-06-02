@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vactrol LPG panel, 4HP (20.32 x 128.5 mm). Authored in mm so coordinates
+     match the widget's mm2px() control placements. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
+     width="20.32mm" height="128.5mm" viewBox="0 0 20.32 128.5">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="128.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#211d3a"/>
+      <stop offset="1" stop-color="#15131f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Panel background + border -->
+  <rect x="0" y="0" width="20.32" height="128.5" fill="url(#bg)"/>
+  <rect x="0.35" y="0.35" width="19.62" height="127.8" fill="none"
+        stroke="#3a3560" stroke-width="0.3" rx="1"/>
+
+  <!-- Brand / title -->
+  <text x="10.16" y="8.5" fill="#e8e4ff" font-family="Helvetica, Arial, sans-serif"
+        font-size="2.6" font-weight="700" text-anchor="middle"
+        letter-spacing="0.15">VACTROL</text>
+  <text x="10.16" y="12" fill="#9b93d6" font-family="Helvetica, Arial, sans-serif"
+        font-size="2.0" font-weight="500" text-anchor="middle"
+        letter-spacing="0.4">LPG</text>
+  <line x1="3" y1="14" x2="17.32" y2="14" stroke="#3a3560" stroke-width="0.25"/>
+
+  <!-- Control labels (centers match VactrolLPG.cpp: x=10mm controls, x=8mm jacks) -->
+  <text x="10.16" y="27.5" fill="#c8c2f0" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.7" text-anchor="middle">RES</text>
+  <text x="10.16" y="47.5" fill="#c8c2f0" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.7" text-anchor="middle">DRIVE</text>
+  <text x="10.16" y="67" fill="#c8c2f0" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.6" text-anchor="middle">MODE</text>
+  <text x="10.16" y="82" fill="#c8c2f0" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.6" text-anchor="middle">OS</text>
+
+  <line x1="3" y1="88" x2="17.32" y2="88" stroke="#3a3560" stroke-width="0.25"/>
+  <text x="13.5" y="96" fill="#9b93d6" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.6" text-anchor="start">IN</text>
+  <text x="13.5" y="109" fill="#9b93d6" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.6" text-anchor="start">CV</text>
+  <text x="13.5" y="121" fill="#d6b3ff" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.6" text-anchor="start">OUT</text>
+
+  <!-- Footer brand -->
+  <text x="10.16" y="126.5" fill="#5a5482" font-family="Helvetica, Arial, sans-serif"
+        font-size="1.5" font-weight="600" text-anchor="middle"
+        letter-spacing="0.3">COMPLIB</text>
+</svg>
