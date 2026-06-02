@@ -3,14 +3,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="81.28mm" height="128.5mm" viewBox="0 0 81.28 128.5">
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="128.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#100b12"/><stop offset="0.5" stop-color="#0b070b"/><stop offset="1" stop-color="#08060a"/></linearGradient></defs>
 <rect x="0" y="0" width="81.28" height="128.5" fill="url(#bg)"/>
-<line x1="2.50" y1="4.00" x2="5.50" y2="4.00" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="4.00" y1="2.50" x2="4.00" y2="5.50" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="75.78" y1="4.00" x2="78.78" y2="4.00" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="77.28" y1="2.50" x2="77.28" y2="5.50" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="2.50" y1="124.50" x2="5.50" y2="124.50" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="4.00" y1="123.00" x2="4.00" y2="126.00" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="75.78" y1="124.50" x2="78.78" y2="124.50" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
-<line x1="77.28" y1="123.00" x2="77.28" y2="126.00" stroke="#F5F5F1" stroke-width="0.22" stroke-opacity="0.42" stroke-linecap="round"/>
 <line x1="40.64" y1="15.50" x2="40.64" y2="102.00" stroke="#F5F5F1" stroke-width="0.18" stroke-opacity="0.16" stroke-linecap="round"/>
 <line x1="39.94" y1="20.00" x2="41.34" y2="20.00" stroke="#F5F5F1" stroke-width="0.18" stroke-opacity="0.16" stroke-linecap="round"/>
 <line x1="39.94" y1="30.00" x2="41.34" y2="30.00" stroke="#F5F5F1" stroke-width="0.18" stroke-opacity="0.16" stroke-linecap="round"/>

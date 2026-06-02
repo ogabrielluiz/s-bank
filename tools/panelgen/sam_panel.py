@@ -295,12 +295,9 @@ class Panel:
                  f'<stop offset="0.5" stop-color="{t["bg"][1]}"/>'
                  f'<stop offset="1" stop-color="{t["bg"][2]}"/></linearGradient></defs>')
 
-        # 1. environment + corner crosshairs (full-bleed: no rounded border, which
-        # reads as a weird inset against the rack rails)
+        # 1. environment (full-bleed: no rounded border — reads weird against the
+        # rails; the corners carry real Rack screws instead of drawn crosshairs)
         o.append(f'<rect x="0" y="0" width="{w:.2f}" height="{H}" fill="url(#bg)"/>')
-        for cx, cy in ((4, 4), (w - 4, 4), (4, H - 4), (w - 4, H - 4)):
-            o.append(self._line(cx - 1.5, cy, cx + 1.5, cy, hair, 0.22, 0.42))
-            o.append(self._line(cx, cy - 1.5, cx, cy + 1.5, hair, 0.22, 0.42))
 
         # channel columns (knob x positions)
         cols = sorted({c.x for c in self.comps if c.kind == "knob"})

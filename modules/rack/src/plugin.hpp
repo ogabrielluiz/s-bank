@@ -28,6 +28,8 @@ struct SBankModule : Module {
 struct SBankModuleWidget : ModuleWidget {
     widget::Widget* panelBlack = nullptr;
     widget::Widget* panelSilver = nullptr;
+    std::vector<widget::Widget*> screwsSilver;  // shown on the black panel
+    std::vector<widget::Widget*> screwsBlack;   // shown on the silver panel
 
     void loadPanels(const std::string& base) {
         panelBlack = createPanel(asset::plugin(pluginInstance, "res/" + base + ".svg"));
@@ -35,13 +37,31 @@ struct SBankModuleWidget : ModuleWidget {
         panelSilver = createPanel(asset::plugin(pluginInstance, "res/" + base + "-silver.svg"));
         panelSilver->visible = false;
         addChild(panelSilver);
+        addScrews();
+    }
+
+    void addScrews() {
+        float x0 = RACK_GRID_WIDTH;
+        float x1 = box.size.x - 2 * RACK_GRID_WIDTH;
+        float y1 = RACK_GRID_HEIGHT - RACK_GRID_WIDTH;
+        for (math::Vec p : {math::Vec(x0, 0), math::Vec(x1, 0), math::Vec(x0, y1), math::Vec(x1, y1)}) {
+            auto* s = createWidget<ScrewSilver>(p);
+            screwsSilver.push_back(s);
+            addChild(s);
+            auto* b = createWidget<ScrewBlack>(p);
+            b->visible = false;
+            screwsBlack.push_back(b);
+            addChild(b);
+        }
     }
 
     void step() override {
         if (module) {
-            int f = static_cast<SBankModule*>(module)->finish;
-            if (panelBlack) panelBlack->visible = (f == 0);
-            if (panelSilver) panelSilver->visible = (f == 1);
+            bool silver = static_cast<SBankModule*>(module)->finish == 1;
+            if (panelBlack) panelBlack->visible = !silver;
+            if (panelSilver) panelSilver->visible = silver;
+            for (auto* s : screwsSilver) s->visible = !silver;  // metallic on black
+            for (auto* b : screwsBlack) b->visible = silver;    // dark on silver
         }
         ModuleWidget::step();
     }
