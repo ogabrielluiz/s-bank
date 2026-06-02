@@ -1,0 +1,17 @@
+{
+  "slug": "ComplibVactrol",
+  "name": "Complib Vactrol",
+  "version": "2.0.0",
+  "license": "MIT OR Apache-2.0",
+  "brand": "Complib",
+  "author": "Complib",
+  "description": "Virtual-analog vactrol low-pass gate (Buchla 292 style), Rust DSP core.",
+  "modules": [
+    {
+      "slug": "VactrolLPG",
+      "name": "Vactrol LPG",
+      "description": "Topology-preserving vactrol low-pass gate with Both/VCA/Lowpass modes.",
+      "tags": ["Low-pass gate", "Filter", "Polyphonic"]
+    }
+  ]
+}

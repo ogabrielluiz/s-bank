@@ -76,6 +76,23 @@ pub unsafe extern "C" fn vactrol_lpg_set_params(
     }));
 }
 
+/// Process one sample. Returns 0.0 on a null pointer or an (unexpected) panic.
+/// Convenient for a host that drives audio one sample at a time (e.g. VCV Rack).
+///
+/// # Safety
+/// `ptr` must be a valid instance pointer or null.
+#[no_mangle]
+pub unsafe extern "C" fn vactrol_lpg_process_sample(
+    ptr: *mut Lpg,
+    audio_in: f32,
+    cv_in: f32,
+) -> f32 {
+    if ptr.is_null() {
+        return 0.0;
+    }
+    catch_unwind(AssertUnwindSafe(|| (*ptr).process_sample(audio_in, cv_in))).unwrap_or(0.0)
+}
+
 /// Process a block. `audio_in`, `cv_in`, and `out` must each point to `len` floats.
 ///
 /// # Safety
