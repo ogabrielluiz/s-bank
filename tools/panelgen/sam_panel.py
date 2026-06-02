@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from strokefont import text_paths  # labels must be vector paths (nanosvg ignores <text>)
+
 # --- brand kit -------------------------------------------------------------------
 HP_MM = 5.08
 PANEL_H = 128.5
@@ -146,44 +148,29 @@ class Panel:
                 f'<path d="M{cx - 1.4:.2f},{4.0} h2.8 M{cx:.2f},{2.6} v2.8" '
                 f'stroke="{LINE}" stroke-width="0.25"/>'
             )
-        # header: S-BANK · title · serial + signal LED
-        out.append(
-            f'<text x="7" y="7" class="disp tag" font-weight="700" fill="#e8e4ff">'
-            f'S<tspan fill="{ORANGE}">-</tspan>BANK</text>'
-        )
-        out.append(
-            f'<text x="{w - 7:.2f}" y="7" class="disp tag" font-weight="700" '
-            f'text-anchor="end" fill="#e8e4ff">{self.title}</text>'
-        )
+        # header: S-BANK · title · divider
+        out.append(text_paths("S-BANK", 7, 7, 2.4, "#e8e4ff", "start", weight=0.22))
+        out.append(text_paths(self.title, w - 7, 7, 2.4, "#e8e4ff", "end", weight=0.22))
         out.append(f'<line x1="7" y1="9" x2="{w - 7:.2f}" y2="9" stroke="{LINE}" stroke-width="0.25"/>')
-        out.append(
-            f'<text x="7" y="{PANEL_H - 3:.1f}" class="sm">SER {self.serial}</text>'
-        )
-        out.append(f'<circle cx="{w - 8:.2f}" cy="{PANEL_H - 3.5:.1f}" r="0.9" fill="{ORANGE}"/>')
-        out.append(
-            f'<text x="{w - 6.5:.2f}" y="{PANEL_H - 3:.1f}" class="sm">SIGNAL STABLE</text>'
-        )
-        out.append(
-            f'<text x="{w / 2:.2f}" y="{PANEL_H - 3:.1f}" class="disp sm" '
-            f'text-anchor="middle" font-weight="600">SAM-e</text>'
-        )
+        # footer: serial · signal LED + status · SAM-e
+        base = PANEL_H - 3.0
+        out.append(text_paths(f"SER {self.serial}", 7, base, 1.5, DIM, "start"))
+        out.append(f'<circle cx="{w - 8:.2f}" cy="{base - 0.7:.1f}" r="0.9" fill="{ORANGE}"/>')
+        out.append(text_paths("SIGNAL STABLE", w - 6.5, base, 1.5, DIM, "start"))
+        out.append(text_paths("SAM-E", w / 2, base, 1.5, DIM, "middle"))
         # dividers
         for y in self.dividers:
             out.append(f'<line x1="7" y1="{y}" x2="{w - 7:.2f}" y2="{y}" stroke="{LINE2}" stroke-width="0.25"/>')
         # free notes
-        for (x, y, text, cls) in self.notes:
-            out.append(f'<text x="{x:.2f}" y="{y:.2f}" class="{cls}" text-anchor="middle">{text}</text>')
-        # component labels
+        for (x, y, text, _cls) in self.notes:
+            out.append(text_paths(text, x, y, 1.6, DIM, "middle"))
+        # component labels (vector paths — nanosvg can't render <text>)
         for c in self.comps:
             if c.kind == "light" or not c.label:
                 continue
             off = _KINDS[c.kind][2]
-            fill = f' fill="{c.accent}"' if c.accent else ""
-            cls = "lbl" if c.kind in ("knob", "knob_sm") else "sm"
-            out.append(
-                f'<text x="{c.x:.2f}" y="{c.y - off:.2f}" class="{cls}"{fill} '
-                f'text-anchor="middle">{c.label}</text>'
-            )
+            size = 1.9 if c.kind in ("knob", "knob_sm") else 1.6
+            out.append(text_paths(c.label, c.x, c.y - off, size, c.accent or LABEL, "middle"))
         out.append("</svg>")
         return "\n".join(out) + "\n"
 
