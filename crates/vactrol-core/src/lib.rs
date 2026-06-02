@@ -23,7 +23,10 @@ pub mod nonlinear;
 pub mod oversample;
 pub mod params;
 pub mod reference;
+pub mod simd;
 pub mod vactrol;
+
+pub use simd::LpgX4;
 
 pub use imperfection::{Imperfection, ImperfectionConfig, DEFAULT_SEED};
 pub use params::{Components, Mode, Params, SerializedState};

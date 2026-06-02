@@ -17,8 +17,12 @@ serde = { version = "1", features = ["derive"] }
 # Deterministic, seedable, serializable streams for the imperfection layer (Phase 3).
 rand = "0.8"
 rand_chacha = "0.3"
+# Portable 4-lane SIMD (maps to Rack's float_4) for the polyphonic voice block.
+wide = "0.7"
 
 [dev-dependencies]
+# For constructing f32x4 inputs in SIMD tests/benches.
+wide = "0.7"
 # Spectral / aliasing / THD analysis (tests only).
 realfft = "3"
 rustfft = "6"

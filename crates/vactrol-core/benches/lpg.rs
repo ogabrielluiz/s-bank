@@ -8,7 +8,8 @@
 //! the typical case, since the real-time guarantee is about the worst case.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use vactrol_core::{ImperfectionConfig, Lpg, Mode, Params};
+use vactrol_core::{ImperfectionConfig, Lpg, LpgX4, Mode, Params};
+use wide::f32x4;
 
 const SR: f32 = 48_000.0;
 const BLOCK: usize = 512;
@@ -104,6 +105,32 @@ fn bench_voices(c: &mut Criterion) {
         b.iter(|| {
             for l in many.iter_mut() {
                 l.process_block(black_box(&audio), black_box(&cv), &mut out);
+            }
+        })
+    });
+
+    // 16 voices as four SIMD blocks of 4 lanes each.
+    let audio4: Vec<f32x4> = audio.iter().map(|&a| f32x4::splat(a)).collect();
+    let cv4: Vec<f32x4> = cv.iter().map(|&c| f32x4::splat(c)).collect();
+    let mut out4 = vec![f32x4::splat(0.0); BLOCK];
+    let mut blocks: Vec<LpgX4> = (0..4)
+        .map(|_| {
+            let mut l = LpgX4::new(SR);
+            l.set_params(Params {
+                mode: Mode::Both,
+                resonance: 0.5,
+                cv_offset: 0.0,
+                drive: 2.0,
+                oversample: 2,
+                adaa: true,
+            });
+            l
+        })
+        .collect();
+    g.bench_function("x16_simd", |b| {
+        b.iter(|| {
+            for l in blocks.iter_mut() {
+                l.process_block(black_box(&audio4), black_box(&cv4), &mut out4);
             }
         })
     });

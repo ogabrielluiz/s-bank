@@ -21,6 +21,47 @@ use std::f32::consts::PI;
 /// sharper transition and deeper stopband (better alias rejection) at more cost.
 pub const HALFBAND_LEN: usize = 61;
 
+/// Blackman-windowed-sinc halfband taps at cutoff 0.5, normalized for unity DC
+/// gain. Shared by the scalar and SIMD oversamplers so they cannot drift.
+pub(crate) fn halfband_taps() -> Vec<f32> {
+    let l = HALFBAND_LEN;
+    let c = (l - 1) / 2; // centre, even by construction (l = 4k+1)
+    let mut h = vec![0.0f32; l];
+    for (k, hk) in h.iter_mut().enumerate() {
+        let x = 0.5 * (k as f32 - c as f32); // cutoff 0.5 (halfband)
+        let sinc = if x == 0.0 {
+            1.0
+        } else {
+            (PI * x).sin() / (PI * x)
+        };
+        let n = l as f32 - 1.0;
+        let w =
+            0.42 - 0.5 * (2.0 * PI * k as f32 / n).cos() + 0.08 * (4.0 * PI * k as f32 / n).cos();
+        *hk = 0.5 * sinc * w;
+    }
+    let sum: f32 = h.iter().sum();
+    for hk in &mut h {
+        *hk /= sum;
+    }
+    h
+}
+
+/// Polyphase decomposition of a halfband: `(even, odd)` subfilters, taps `h[2m+p]`.
+pub(crate) fn halfband_polyphase(h: &[f32]) -> (Vec<f32>, Vec<f32>) {
+    let l = h.len();
+    let he = (0..)
+        .map(|m| 2 * m)
+        .take_while(|&i| i < l)
+        .map(|i| h[i])
+        .collect();
+    let ho = (0..)
+        .map(|m| 2 * m + 1)
+        .take_while(|&i| i < l)
+        .map(|i| h[i])
+        .collect();
+    (he, ho)
+}
+
 /// One 2x oversampling stage with its own halfband state.
 ///
 /// Upsampling uses the halfband's polyphase decomposition (even phase is a pure
@@ -43,42 +84,11 @@ struct HalfbandStage {
 
 impl HalfbandStage {
     fn new() -> Self {
-        let l = HALFBAND_LEN;
-        let c = (l - 1) / 2; // centre, even by construction (l = 4k+1)
-        let mut h = vec![0.0f32; l];
-        for (k, hk) in h.iter_mut().enumerate() {
-            let x = 0.5 * (k as f32 - c as f32); // cutoff 0.5 (halfband)
-            let sinc = if x == 0.0 {
-                1.0
-            } else {
-                (PI * x).sin() / (PI * x)
-            };
-            let n = l as f32 - 1.0;
-            let w = 0.42 - 0.5 * (2.0 * PI * k as f32 / n).cos()
-                + 0.08 * (4.0 * PI * k as f32 / n).cos();
-            *hk = 0.5 * sinc * w;
-        }
-        // Normalize for unity DC gain through the lowpass.
-        let sum: f32 = h.iter().sum();
-        for hk in &mut h {
-            *hk /= sum;
-        }
-
-        // Polyphase decomposition for upsampling: phase p taps are h[2m + p].
-        let he: Vec<f32> = (0..)
-            .map(|m| 2 * m)
-            .take_while(|&i| i < l)
-            .map(|i| h[i])
-            .collect();
-        let ho: Vec<f32> = (0..)
-            .map(|m| 2 * m + 1)
-            .take_while(|&i| i < l)
-            .map(|i| h[i])
-            .collect();
-
+        let h = halfband_taps();
+        let (he, ho) = halfband_polyphase(&h);
         Self {
             xh: vec![0.0; he.len()],
-            y2: vec![0.0; l],
+            y2: vec![0.0; h.len()],
             h,
             he,
             ho,

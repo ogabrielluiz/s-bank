@@ -11,7 +11,7 @@
 use crate::params::Components;
 
 /// Floor on LED current so the power law cannot divide by zero (amps).
-const I_FLOOR_A: f32 = 1.0e-7;
+pub(crate) const I_FLOOR_A: f32 = 1.0e-7;
 
 #[derive(Debug, Clone)]
 pub struct Vactrol {

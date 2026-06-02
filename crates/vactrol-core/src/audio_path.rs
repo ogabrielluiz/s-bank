@@ -43,7 +43,7 @@ use crate::params::{Components, Mode, Params};
 
 /// Resonance span: `K = 1 + resonance·K_SPAN`. Tuned so `resonance = 1` reaches
 /// bounded self-oscillation (the `amax` boundary).
-const K_SPAN: f32 = 2.2;
+pub(crate) const K_SPAN: f32 = 2.2;
 
 /// The companion-model ladder: capacitor histories, node memory, and the in-loop
 /// buffer nonlinearity. One `solve_step` advances a single (possibly oversampled)

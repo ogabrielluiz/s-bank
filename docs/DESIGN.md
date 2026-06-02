@@ -49,6 +49,10 @@ against Eq. 12 directly.
 - **Phase 4**: golden-file management (`reference` module, `bless`, tolerance
   comparison) + smoke/correctness/spectral tests. Done.
 - **Phase 5**: benchmark suite (per-config, voices, worst-case vs typical). Done.
+- **SIMD voice block** (`simd.rs`, `LpgX4`): four voices on `wide::f32x4`, a
+  line-for-line mirror of the scalar DSP (verified to match within 1e-3 in
+  `tests/simd.rs`). 16 voices cost ~0.73 ms vs ~2.4 ms scalar in the bench, a
+  ~3.3x throughput gain. Imperfection is not yet applied on this path.
 - **Phase 6**: tiered CI design documented in `docs/CI.md` (YAML ready to add;
   see the note there about the `workflows` permission).
 - **Phase 7**: VCV adapter. Placeholder only (`vcv-adapter/`).

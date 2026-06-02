@@ -8,11 +8,11 @@
 use crate::params::Components;
 
 /// LED current at full drive (datasheet ON region tops out near 40 mA).
-const I_MAX_A: f32 = 0.040;
+pub(crate) const I_MAX_A: f32 = 0.040;
 /// Soft-knee scale (volts) of the CV-to-current curve.
-const V_SCALE: f32 = 2.5;
+pub(crate) const V_SCALE: f32 = 2.5;
 /// Time constant of the control smoothing filter (seconds).
-const CTRL_TAU_S: f32 = 0.0015;
+pub(crate) const CTRL_TAU_S: f32 = 0.0015;
 
 #[derive(Debug, Clone)]
 pub struct ControlPath {
