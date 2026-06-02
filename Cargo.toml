@@ -1,0 +1,26 @@
+# Workspace for the vactrol low-pass gate virtual-analog vertical slice.
+#
+# The DSP lives in `vactrol-core`, a portable library that has no dependency on
+# the VCV Rack SDK so the whole test/bench pipeline runs headless. A thin C++
+# adapter (future `vcv-adapter/`) links the staticlib over a C ABI.
+[workspace]
+resolver = "2"
+members = [
+    "crates/vactrol-core",
+    "crates/vactrol-harness",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ogabrielluiz/complib"
+
+# Keep dev/test builds debuggable but not glacial.
+[profile.dev]
+opt-level = 1
+
+# Release profile is what the audio thread runs; keep it lean.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

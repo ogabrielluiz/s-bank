@@ -1,0 +1,4 @@
+{
+  "note": "Golden buffers land in Phase 4. Each entry records seed, sample rate, toolchain, and platform.",
+  "goldens": []
+}

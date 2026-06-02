@@ -1,0 +1,33 @@
+[package]
+name = "vactrol-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Portable virtual-analog vactrol low-pass gate DSP core (Buchla 292 style)"
+
+[lib]
+# staticlib/cdylib for the C++ VCV adapter over a C ABI; rlib so the harness,
+# tests and benches can depend on it directly.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+num-traits = "0.2"
+serde = { version = "1", features = ["derive"] }
+# Deterministic, seedable, serializable streams for the imperfection layer (Phase 3).
+rand = "0.8"
+rand_chacha = "0.3"
+
+[dev-dependencies]
+# Spectral / aliasing / THD analysis (tests only).
+realfft = "3"
+rustfft = "6"
+serde_json = "1"
+# Audio-thread allocation guard.
+assert_no_alloc = "1"
+# Benchmarks (Phase 5 fleshes these out; codspeed-criterion-compat shim added then).
+criterion = "0.5"
+
+[[bench]]
+name = "lpg"
+harness = false
