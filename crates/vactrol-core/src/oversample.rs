@@ -1,8 +1,10 @@
-//! Oversampling for the memoryless buffer nonlinearity.
+//! Oversampling for the in-loop resonance nonlinearity.
 //!
 //! A 2x stage upsamples with a polyphase halfband FIR, applies the supplied
-//! nonlinearity at the doubled rate, then decimates with the same halfband. 4x is
-//! two stages cascaded (the inner stage runs as the outer stage's nonlinearity).
+//! per-sample function at the doubled rate, then decimates with the same halfband.
+//! The audio path passes its entire delay-free `solve_step` as that function, so
+//! the whole feedback solve (not a memoryless buffer) runs at the finer timestep.
+//! 4x is two stages cascaded (the inner stage runs as the outer stage's function).
 //! 1x is a passthrough. The factor is selectable per call so the bench harness can
 //! compare 1x / 2x / 4x.
 //!

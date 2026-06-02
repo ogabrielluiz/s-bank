@@ -44,8 +44,10 @@ this; the DC-divider identity was verified numerically against `R3/(R3+2·Rf)`.
 
 - **Phase 0**: workspace scaffolding. Done.
 - **Phase 1**: DSP core + vactrol model + tests. Done.
-- **Phase 2**: first-order ADAA + polyphase halfband oversampling (1x/2x/4x) +
-  spectral/aliasing tests. Done.
+- **Phase 2**: polyphase halfband oversampling (1x/2x/4x) of the full delay-free
+  solve + spectral/aliasing tests. Done. (An earlier memoryless output-buffer ADAA
+  stage was removed once the audio path became the in-loop state-space solve; see
+  the antialiasing notes.)
 - **Phase 3**: imperfection layer (per-instance tolerance, drift, thermal, noise
   floor), seedable and serializable. Done.
 - **Phase 4**: golden-file management (`reference` module, `bless`, tolerance
@@ -55,25 +57,34 @@ this; the DC-divider identity was verified numerically against `R3/(R3+2·Rf)`.
   line-for-line mirror of the scalar DSP (verified to match within 1e-3 in
   `tests/simd.rs`). 16 voices cost ~0.73 ms vs ~2.4 ms scalar in the bench, a
   ~3.3x throughput gain. Imperfection is not yet applied on this path.
-- **Phase 6**: tiered CI design documented in `docs/CI.md` (YAML ready to add;
-  see the note there about the `workflows` permission).
-- **Phase 7**: VCV adapter. Placeholder only (`vcv-adapter/`).
+- **Phase 6**: tiered CI live in `.github/workflows/` (smoke/pr/nightly/release);
+  rationale in `docs/CI.md`. Done.
+- **Phase 7**: VCV adapter builds and links against the Rack v2 SDK on
+  macOS/arm64 (`vcv-adapter/`, produces `plugin.dylib` over the C ABI). Done; a
+  scripted in-Rack runtime test and other platforms remain open.
 
 ## Antialiasing notes
 
-The buffer `tanh` sits **inside** the resonance feedback loop (the Sallen-Key C1
-return). It is evaluated on the previous (oversampled) output, so the MNA matrix
-stays passive and the per-sample solve stays linear and well-posed; the explicit
-one-sample feedback is the modelling approximation. Antialiasing comes from
-oversampling the whole feedback solve (the halfband runs the ladder `factor` times
-per output sample at the finer timestep), with first-order ADAA on the buffer as
-an additional reduction. Measured aliasing for the recommended 2x+ADAA config is
-~ -61 dB rel fundamental on a 9 kHz full-scale tone at drive 5 (`tests/spectral.rs`).
+The `tanh` resonance nonlinearity sits **inside** the delay-free loop. It is
+handled by first-order (Taylor) instantaneous linearisation about the previous
+output `xo` each sample: `g(v) ≈ g(xo) + g'(xo)·(v − xo)`, where the constant part
+`d1·(gx − xo·s2)` is injected as a source and the slope `s2 = 1 − tanh²` is folded
+into the closed-form solve (the `dmas` Schur factor in `audio_path.rs`). So the
+per-sample solve stays linear and well-posed with no Newton iteration — this is
+the paper's Taylor approach, not an explicit/delayed feedback.
 
-This is a deliberate trade: the explicit (delayed) feedback keeps the solve cheap
-and robust. Replacing it with instantaneous linearisation of the tanh around the
-previous operating point (the paper's Taylor approach) would tighten the loop at
-the cost of a per-sample relinearisation; that is the documented upgrade path.
+Antialiasing comes from **oversampling the whole delay-free solve**: the halfband
+runs the ladder `factor` times per output sample at the finer timestep (the
+`Oversampler` wraps the entire `solve_step`, not a memoryless buffer). Measured
+aliasing for the recommended 2x config is ~ -61 dB rel fundamental on a 9 kHz
+full-scale tone at drive 5 (`tests/spectral.rs`).
+
+> History: earlier revisions placed a memoryless `tanh` buffer at the path output
+> with first-order ADAA (`src/nonlinear.rs`) and an explicit one-sample resonance
+> feedback. When the audio path was rewritten to the authors' state-space cell
+> with in-loop instantaneous linearisation, that ADAA buffer (and its inert `adaa`
+> flag) became dead code and was removed; oversampling the solve is the
+> antialiasing path.
 
 ## References
 
