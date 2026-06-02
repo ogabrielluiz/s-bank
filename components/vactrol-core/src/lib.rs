@@ -17,7 +17,6 @@
 
 pub mod audio_path;
 pub mod control_path;
-pub mod ffi;
 pub mod imperfection;
 pub mod oversample;
 pub mod params;

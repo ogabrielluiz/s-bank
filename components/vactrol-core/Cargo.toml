@@ -7,9 +7,9 @@ repository.workspace = true
 description = "Portable virtual-analog vactrol low-pass gate DSP core (Buchla 292 style)"
 
 [lib]
-# staticlib/cdylib for the C++ VCV adapter over a C ABI; rlib so the harness,
-# tests and benches can depend on it directly.
-crate-type = ["staticlib", "cdylib", "rlib"]
+# A pure DSP component: plain rlib. The C ABI lives in modules/plugin (which links
+# this), so the component stays clean and reusable; harness/tests/benches use the rlib.
+crate-type = ["rlib"]
 
 [dependencies]
 num-traits = "0.2"

@@ -12,7 +12,7 @@
 #include "plugin.hpp"
 
 extern "C" {
-#include "../vactrol_core.h"
+#include "../s_bank.h"
 }
 
 static const int MAX_CHANNELS = 16;

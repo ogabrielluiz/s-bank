@@ -6,8 +6,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/vactrol-core",
-    "crates/vactrol-harness",
+    "components/vactrol-core",
+    "components/strike-core",
+    "modules/plugin",
+    "tools/harness",
 ]
 
 [workspace.package]

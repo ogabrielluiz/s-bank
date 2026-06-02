@@ -1,0 +1,23 @@
+{
+  "slug": "SBank",
+  "name": "S-Bank",
+  "version": "2.0.0",
+  "license": "MIT OR Apache-2.0",
+  "brand": "S-Bank",
+  "author": "Sam-e",
+  "description": "Demo VCV Rack modules built on the S-Bank analog-emulation DSP library.",
+  "modules": [
+    {
+      "slug": "VactrolLPG",
+      "name": "Vactrol LPG",
+      "description": "Topology-preserving vactrol low-pass gate (Buchla 292 style) with Both/VCA/Lowpass modes.",
+      "tags": ["Low-pass gate", "Filter", "Polyphonic"]
+    },
+    {
+      "slug": "Strike",
+      "name": "Strike",
+      "description": "Clean zero-bleed, envelope-driven dual low-pass gate: shaped decay, ping, memory, continuous material morph.",
+      "tags": ["Low-pass gate", "Filter", "Envelope generator", "Dual"]
+    }
+  ]
+}

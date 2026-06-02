@@ -7,8 +7,7 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-use crate::params::{Mode, Params};
-use crate::Lpg;
+use vactrol_core::{Lpg, Mode, Params};
 
 /// Create an LPG instance. Returns null on failure.
 ///

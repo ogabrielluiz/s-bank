@@ -504,6 +504,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
+name = "s-bank-plugin"
+version = "0.1.0"
+dependencies = [
+ "strike-core",
+ "vactrol-core",
+]
+
+[[package]]
 name = "safe_arch"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,6 +583,14 @@ name = "strength_reduce"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
+
+[[package]]
+name = "strike-core"
+version = "0.1.0"
+dependencies = [
+ "rand",
+ "rand_chacha",
+]
 
 [[package]]
 name = "syn"

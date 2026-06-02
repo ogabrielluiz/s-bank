@@ -1,0 +1,17 @@
+[package]
+name = "strike-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Pure DSP rlib (no C ABI here): the single plugin staticlib re-exports it over the
+# C boundary, so two instruments share one Rust runtime in the VCV plugin.
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+rand = "0.8"
+rand_chacha = "0.3"
+
+[dev-dependencies]

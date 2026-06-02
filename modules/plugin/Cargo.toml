@@ -1,0 +1,16 @@
+[package]
+name = "s-bank-plugin"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "S-Bank VCV Rack plugin core: one C ABI re-exporting the analog DSP components"
+
+# The single staticlib the C++ VCV adapter links. It bundles every S-Bank component
+# behind one Rust runtime and exposes them all over a flat C ABI.
+[lib]
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+vactrol-core = { path = "../../components/vactrol-core" }
+strike-core = { path = "../../components/strike-core" }

@@ -1,38 +1,36 @@
 # S-Bank
 
-**The signal bank** — a virtual-analog DSP component library for VCV Rack. Part of
-the **Sam-e** signal system (`S-` is the signal); `S-Bank` is the growing bank of
-audio instruments built on it.
+**The signal bank** — a library of analog-emulation DSP building blocks that help you
+build VCV Rack modules with convincing analog behaviour and sound. Part of the
+**Sam-e** signal system (`S-` is the signal). The library is the product; the modules
+here are demos that use it to prove it works and show how.
 
-Each component is a headless, testable Rust core that a thin C++ VCV Rack adapter
-links over a C ABI. The first instrument in the bank is a **vactrol low-pass gate**
-(Buchla 292 style): a topology-preserving 2-pole core driven by an asymmetric
-vactrol envelope.
+Each component is a headless, testable Rust core; a thin C++ VCV Rack adapter links
+them over a single C ABI. Two instruments live in the bank today: a **vactrol
+low-pass gate** (Buchla 292 style — dirty, resonant) and **Strike**, a clean,
+zero-bleed, envelope-driven low-pass gate.
 
-- DSP core: [`crates/vactrol-core`](crates/vactrol-core)
-- Headless harness: [`crates/vactrol-harness`](crates/vactrol-harness)
-- VCV Rack adapter: [`vcv-adapter`](vcv-adapter)
-- Brand living document (Sam-e / S-): [`site`](site)
-- Design notes and references: [`docs/DESIGN.md`](docs/DESIGN.md)
-- CI design: [`docs/CI.md`](docs/CI.md)
+## Repo layout — the library vs. the demos
 
-The vactrol core is the Parker & D'Angelo 3-capacitor state-space 292 model
-discretised topology-preservingly and solved as a delay-free loop each sample; the
-resonance `tanh` is linearised in-loop about the previous output, with polyphase
-halfband oversampling (1x/2x/4x) of the whole solve for antialiasing, a 4-voice SIMD
-path, and a seedable/serializable analogue-imperfection layer (per-instance
-tolerance, drift, thermal wander, noise floor — applied per lane on the SIMD path).
+- **`components/`** — the library: reusable analog-emulation DSP cores (pure Rust
+  rlibs, no Rack dependency).
+  - [`vactrol-core`](components/vactrol-core) — Buchla-292 vactrol LPG.
+  - [`strike-core`](components/strike-core) — clean EG-driven gate.
+- **`modules/`** — demo VCV Rack modules built on the library:
+  - [`plugin`](modules/plugin) — one Rust staticlib re-exporting every component over a
+    flat C ABI (so they share one runtime in the plugin).
+  - [`rack`](modules/rack) — the C++ VCV adapter: module sources, panels, `plugin.json`.
+- **`tools/`** — [`harness`](tools/harness) (headless gen/bless).
+- **`site/`** — the Sam-e / S- brand living document.
+- **`docs/`** — design notes ([`DESIGN.md`](docs/DESIGN.md)) and CI design ([`CI.md`](docs/CI.md)).
 
 ## Quick start
 
 ```sh
-cargo test                            # smoke, correctness, spectral, golden
+cargo test                                 # all components: smoke, golden, spectral, behavior
 cargo clippy --all-targets -- -D warnings
-cargo bench --bench lpg               # per-config / voices / worst-case
-cargo run -p vactrol-harness -- gen   # demo pluck
-cargo run -p vactrol-harness -- bless # regenerate golden buffers
+cargo run -p vactrol-harness -- gen        # demo pluck (vactrol)
 
-# VCV Rack plugin (needs the Rack SDK):
-cargo build --release -p vactrol-core
-(cd vcv-adapter && make RACK_DIR=/path/to/Rack-SDK)
+# VCV Rack plugin (needs the Rack SDK) — builds modules/plugin then the adapter:
+cd modules/rack && make install RACK_DIR=/path/to/Rack-SDK
 ```
