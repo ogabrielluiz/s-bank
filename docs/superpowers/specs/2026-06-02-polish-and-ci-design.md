@@ -9,19 +9,35 @@ add a second component — that is a separate, later stream. The value here is t
 substrate a multi-component lib needs first: an honest test suite, real CI, and a
 core whose docs match its code.
 
+## Goal (session)
+
+> deliver what we need to build the analog component lib for building VCV Rack
+> modules
+
+That reframes the target: it is not enough to harden the headless core — the
+**bridge from the core to an actual VCV Rack module must build and be verified**.
+The Rack SDK is present on this machine (`~/Projects/Rack-SDK`, arm64, Rack v2),
+so we build the real plugin, not just a link smoke test.
+
 ## Scope
 
-Two work streams against the current `main` (vactrol-core green, 8 commits in):
+Streams against the current `main` (vactrol-core green, 8 commits in):
 
 - **Stream A — CI**: commit the documented workflows so reliability is enforced,
-  not aspirational.
+  not aspirational. Correct the two documented-but-broken bits (see A below) so
+  the committed CI is actually green.
 - **Stream B — Polish**: remove an inert flag that makes the suite test a lie
   (B1), reconcile stale docs (B3), and close the SIMD path's analog-fidelity gap
   (B2, the separable stream).
+- **Stream C — VCV adapter builds**: take the adapter from unverified scaffold to
+  a plugin that compiles, links the Rust staticlib, and loads. This is the piece
+  the session goal most directly demands.
 
 Out of scope: adding a second component; ABI stabilization; the per-sample Newton
 relinearisation of the resonance nonlinearity (the instantaneous linearisation
-already in `audio_path.rs` is sufficient and was the documented upgrade).
+already in `audio_path.rs` is sufficient and was the documented upgrade); exposing
+the SIMD `LpgX4` path over the FFI (the adapter stays scalar-per-channel for now —
+a noted follow-up).
 
 ## Background: what's actually true today
 
@@ -58,10 +74,20 @@ not have that limit.
   lacks `workflows` permission" to "these workflows are live in
   `.github/workflows/`; this file is the rationale and tier reference."
 
+**Two corrections to the documented YAML** (committing red CI would contradict the
+"reliable" goal):
+- `smoke.yml` runs `cargo test --test smoke` — there is **no `smoke.rs`** in the
+  suite. Replace with real fast must-pass tests: `--test stability --test no_alloc
+  --test vactrol_envelope`.
+- `pr.yml`'s bench-gate uses CodSpeed (`cargo codspeed`, `CODSPEED_TOKEN`) but the
+  crate has **no codspeed dependency** (only a comment promising one). Replace the
+  gate with a dependency-free `cargo bench --bench lpg --no-run` (compile check),
+  and note CodSpeed as an opt-in future enhancement in `docs/CI.md`.
+
 **Verification:** parse each file with `actionlint` if available, else a YAML
-parse check (e.g. `python -c "import yaml,sys; yaml.safe_load(open(p))"` per file).
-These are the same tiers documented: smoke (every push), pr (full matrix + bench
-gate), nightly (extended sweeps), release (artifact build).
+parse check (`python3 -c "import yaml; yaml.safe_load(open(p))"` per file). Tiers:
+smoke (every push), pr (full matrix + bench compile), nightly (extended sweeps),
+release (artifact build).
 
 ## Stream B1 — Remove the inert ADAA machinery
 
@@ -134,6 +160,30 @@ emulation fidelity and test coverage rather than reliability of what exists.
 - Fix `oversample.rs` module doc: "oversamples the full delay-free solve," not
   "the memoryless buffer nonlinearity."
 
+## Stream C — VCV adapter actually builds
+
+The adapter (`vcv-adapter/`) is a faithful but never-compiled skeleton. The
+session goal requires it to build against the present Rack SDK.
+
+**Changes:**
+- **ABI sync (depends on B1):** regenerate `vcv-adapter/vactrol_core.h` with
+  `cbindgen` after `adaa` is removed (`cd crates/vactrol-core && cbindgen --config
+  cbindgen.toml --output ../../vcv-adapter/vactrol_core.h`). Update
+  `src/VactrolLPG.cpp`'s `vactrol_lpg_set_params(...)` call to drop the trailing
+  `adaa` argument (currently passes `1`).
+- **Panel:** add `vcv-adapter/res/VactrolLPG.svg` — a minimal valid Rack panel
+  (correct HP width, mm units) so the module loads and `make` packages it. The
+  widget already places knobs/ports at fixed mm coordinates; the SVG must match
+  that footprint.
+- **Build & verify:** `cd vcv-adapter && make RACK_DIR=~/Projects/Rack-SDK`
+  builds `plugin.dylib` linking `../target/release/libvactrol_core.a`. Success
+  criterion: clean compile + link (the Rust-in-Rack linking risk the README flags
+  is retired on this arm64/macOS target). A loaded-in-Rack runtime check is
+  out of scope (no scripted Rack host), but the build+link is the deliverable.
+
+**Note:** Cargo must emit the staticlib for the right arch; the host is arm64 and
+the SDK is arm64, so the default target is correct.
+
 ## Verification gate (whole change)
 
 - `cargo test` — all suites green, **golden buffers unchanged**.
@@ -145,8 +195,11 @@ emulation fidelity and test coverage rather than reliability of what exists.
 ## Build sequence
 
 1. Stream A (CI) — independent, lowest risk, lands reliability infra first.
-2. B1 (remove ADAA) — touches the most files; do before B3 so docs describe the
-   post-removal state.
-3. B3 (docs) — reflects B1's result and B2's status.
-4. B2 (SIMD imperfection) — largest DSP change; isolated to `simd.rs` + its test.
+2. B1 (remove ADAA) — touches the most files (incl. FFI + C++ caller); do before
+   C so the regenerated header reflects the final ABI, and before B3 so docs
+   describe the post-removal state.
+3. Stream C (VCV plugin builds) — depends on B1's ABI; end-to-end proof of the
+   session goal. Regenerate header, fix caller, add panel, `make`.
+4. B3 (docs) — reflects B1's result, B2's status, and the now-working adapter.
+5. B2 (SIMD imperfection) — largest DSP change; isolated to `simd.rs` + its test.
    Separable: can be deferred to a follow-up if priorities shift to component #2.
