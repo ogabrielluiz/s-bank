@@ -17,6 +17,8 @@ fn process_block_does_not_allocate() {
         resonance: 0.5,
         cv_offset: 0.0,
         drive: 1.0,
+        oversample: 2,
+        adaa: true,
     });
 
     // Allocate the buffers up front, outside the guarded region.

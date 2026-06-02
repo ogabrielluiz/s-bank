@@ -7,7 +7,7 @@
 
 use realfft::RealFftPlanner;
 use vactrol_core::audio_path::AudioPath;
-use vactrol_core::params::{Components, Mode};
+use vactrol_core::params::{Components, Mode, Params};
 
 const SR: f32 = 48_000.0;
 const N: usize = 8192;
@@ -17,11 +17,20 @@ fn ir_cutoff(rf: f32) -> f32 {
     let comp = Components::default();
     let mut ap = AudioPath::new(SR);
 
-    // Impulse response (linear: drive = 0, resonance = 0, pure Lowpass mode).
+    // Impulse response (linear: drive = 0, resonance = 0, pure Lowpass mode), so
+    // the nonlinear/oversampling stage is bypassed and we see the plain SVF.
+    let params = Params {
+        mode: Mode::Lowpass,
+        resonance: 0.0,
+        cv_offset: 0.0,
+        drive: 0.0,
+        oversample: 1,
+        adaa: false,
+    };
     let mut ir = vec![0.0f32; N];
     for (i, s) in ir.iter_mut().enumerate() {
         let x = if i == 0 { 1.0 } else { 0.0 };
-        *s = ap.process(x, rf, Mode::Lowpass, 0.0, 0.0, &comp);
+        *s = ap.process(x, rf, &params, &comp);
     }
 
     let mut planner = RealFftPlanner::<f32>::new();

@@ -12,6 +12,8 @@ fn bench_process_block(c: &mut Criterion) {
         resonance: 0.5,
         cv_offset: 0.0,
         drive: 1.0,
+        oversample: 2,
+        adaa: true,
     });
 
     let audio: Vec<f32> = (0..512).map(|i| (i as f32 * 0.1).sin()).collect();

@@ -24,10 +24,12 @@ pub mod oversample;
 pub mod params;
 pub mod vactrol;
 
+pub use imperfection::{Imperfection, ImperfectionConfig, DEFAULT_SEED};
 pub use params::{Components, Mode, Params, SerializedState};
 
 use audio_path::AudioPath;
 use control_path::ControlPath;
+use imperfection::Imperfection as ImperfectionLayer;
 use vactrol::Vactrol;
 
 /// One voice of the vactrol low-pass gate.
@@ -35,24 +37,36 @@ use vactrol::Vactrol;
 pub struct Lpg {
     sample_rate: f32,
     params: Params,
+    /// Nominal component values (before per-instance tolerance).
+    base_comp: Components,
+    /// Effective component values (tolerance applied when enabled).
     comp: Components,
     control: ControlPath,
     vactrol: Vactrol,
     audio: AudioPath,
+    imperfection: ImperfectionLayer,
     last_rf: f32,
 }
 
 impl Lpg {
-    /// Build a voice at the given sample rate with default parameters/components.
+    /// Build a voice at the given sample rate with default parameters/components
+    /// and the default fingerprint seed (imperfection disabled by default).
     pub fn new(sample_rate: f32) -> Self {
+        Self::with_seed(sample_rate, DEFAULT_SEED)
+    }
+
+    /// Build a voice with an explicit fingerprint seed.
+    pub fn with_seed(sample_rate: f32, seed: u64) -> Self {
         let comp = Components::default();
         Self {
             sample_rate,
             params: Params::default(),
+            base_comp: comp,
             comp,
             control: ControlPath::new(sample_rate),
             vactrol: Vactrol::new(sample_rate),
             audio: AudioPath::new(sample_rate),
+            imperfection: ImperfectionLayer::from_seed(seed),
             last_rf: comp.r_off,
         }
     }
@@ -76,8 +90,51 @@ impl Lpg {
         &self.params
     }
 
+    /// Effective component values (per-instance tolerance applied when enabled).
     pub fn components(&self) -> &Components {
         &self.comp
+    }
+
+    /// The fingerprint seed for this instance.
+    pub fn seed(&self) -> u64 {
+        self.imperfection.seed
+    }
+
+    /// Configure the imperfection layer. Re-derives per-instance component
+    /// tolerance from the seed and resets the layer's transient drift state.
+    pub fn set_imperfection(&mut self, config: ImperfectionConfig) {
+        self.imperfection.config = config;
+        self.comp = self.imperfection.tolerance_components(&self.base_comp);
+        self.imperfection.reset();
+        // Keep the closed-gate resistance consistent with the (possibly perturbed)
+        // off-resistance.
+        self.last_rf = self.comp.r_off;
+    }
+
+    /// The current imperfection configuration.
+    pub fn imperfection_config(&self) -> &ImperfectionConfig {
+        &self.imperfection.config
+    }
+
+    /// Serializable state: the seed, params, and imperfection config. Tolerance is
+    /// reproduced deterministically from the seed, so this is enough to restore an
+    /// instance exactly.
+    pub fn serialized_state(&self) -> SerializedState {
+        SerializedState {
+            seed: self.imperfection.seed,
+            params: self.params,
+            components: self.base_comp,
+            imperfection: self.imperfection.config,
+        }
+    }
+
+    /// Rebuild an instance from serialized state.
+    pub fn from_state(sample_rate: f32, state: &SerializedState) -> Self {
+        let mut lpg = Self::with_seed(sample_rate, state.seed);
+        lpg.base_comp = state.components;
+        lpg.params = state.params;
+        lpg.set_imperfection(state.imperfection);
+        lpg
     }
 
     /// Last vactrol resistance (ohms). Useful for tests and metering.
@@ -90,6 +147,7 @@ impl Lpg {
         self.control.reset();
         self.vactrol.reset(&self.comp);
         self.audio.reset();
+        self.imperfection.reset();
         self.last_rf = self.comp.r_off;
     }
 
@@ -97,19 +155,14 @@ impl Lpg {
     /// voltage. Allocation-free.
     #[inline]
     pub fn process_sample(&mut self, audio_in: f32, cv_in: f32) -> f32 {
-        let current = self
-            .control
-            .process(cv_in, self.params.cv_offset, &self.comp);
+        self.imperfection.update(self.sample_rate);
+        let params = self.imperfection.apply_params(&self.params);
+
+        let current = self.control.process(cv_in, params.cv_offset, &self.comp);
         let rf = self.vactrol.process(current, &self.comp);
         self.last_rf = rf;
-        self.audio.process(
-            audio_in,
-            rf,
-            self.params.mode,
-            self.params.resonance,
-            self.params.drive,
-            &self.comp,
-        )
+        let y = self.audio.process(audio_in, rf, &params, &self.comp);
+        self.imperfection.apply_output(y)
     }
 
     /// Process a block. `audio_in`, `cv_in`, and `out` should share a length;

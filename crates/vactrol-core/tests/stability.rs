@@ -18,6 +18,8 @@ fn finite_under_fast_modulation() {
             resonance: 1.0, // near the self-oscillation boundary
             cv_offset: 0.0,
             drive: 4.0,
+            oversample: 2,
+            adaa: true,
         });
 
         let n = SR as usize * 2;
@@ -65,6 +67,8 @@ fn pathological_inputs_stay_finite() {
             resonance: 0.9,
             cv_offset: 0.0,
             drive: 2.0,
+            oversample: 4,
+            adaa: true,
         });
         for i in 0..SR as usize {
             let (a, c) = f(i);

@@ -44,6 +44,10 @@ pub struct Params {
     pub cv_offset: f32,
     /// Drive into the tanh buffer/resonance nonlinearity. `0.0` is linear.
     pub drive: f32,
+    /// Oversampling factor for the nonlinearity: 1, 2, or 4.
+    pub oversample: u8,
+    /// Enable first-order ADAA on the buffer nonlinearity.
+    pub adaa: bool,
 }
 
 impl Default for Params {
@@ -53,6 +57,19 @@ impl Default for Params {
             resonance: 0.2,
             cv_offset: 0.0,
             drive: 1.0,
+            oversample: 2,
+            adaa: true,
+        }
+    }
+}
+
+impl Params {
+    /// Oversampling factor as a clamped `usize` in {1, 2, 4}.
+    pub fn oversample_factor(&self) -> usize {
+        match self.oversample {
+            0 | 1 => 1,
+            2 | 3 => 2,
+            _ => 4,
         }
     }
 }
@@ -101,13 +118,16 @@ impl Default for Components {
     }
 }
 
-/// Persisted per-instance state: the fingerprint seed plus the parameter snapshot.
+/// Persisted per-instance state: the fingerprint seed plus the parameter and
+/// imperfection-config snapshots.
 ///
-/// The Phase 3 imperfection layer derives per-component tolerances deterministically
-/// from `seed`, so storing the seed is enough to reproduce a saved module exactly.
+/// The imperfection layer derives per-component tolerances deterministically from
+/// `seed`, so storing the seed (plus nominal components and config) is enough to
+/// reproduce a saved module exactly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedState {
     pub seed: u64,
     pub params: Params,
     pub components: Components,
+    pub imperfection: crate::imperfection::ImperfectionConfig,
 }

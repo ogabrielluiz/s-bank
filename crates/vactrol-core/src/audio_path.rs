@@ -10,12 +10,17 @@
 //! the SVF damping `k`; `k -> 0` approaches self-oscillation (the `amax` boundary)
 //! but the linear solve stays finite.
 //!
+//! The SVF is linear, so it runs at the base rate. Only the memoryless `tanh`
+//! buffer is oversampled (and optionally ADAA'd); that is where aliasing is
+//! generated. When `drive == 0` the nonlinear stage is bypassed entirely, so the
+//! linear path is bit-for-bit the plain SVF (no oversampling latency or filtering).
+//!
 //! The scalar `f32` path here is written so a lane-parametric SIMD variant (Rack's
-//! `float_4`) is a drop-in: `process` is branch-light and operates one frame at a
-//! time over plain arithmetic.
+//! `float_4`) is a drop-in: the SVF is branch-light arithmetic over one frame.
 
-use crate::nonlinear;
-use crate::params::{Components, Mode};
+use crate::nonlinear::{self, TanhAdaa};
+use crate::oversample::Oversampler;
+use crate::params::{Components, Mode, Params};
 
 #[derive(Debug, Clone)]
 pub struct AudioPath {
@@ -23,6 +28,9 @@ pub struct AudioPath {
     /// Trapezoidal integrator states (the C1, C2 "equivalent" capacitor states).
     ic1eq: f32,
     ic2eq: f32,
+    /// Oversampler and ADAA state for the buffer nonlinearity.
+    oversampler: Oversampler,
+    adaa: TanhAdaa,
 }
 
 impl AudioPath {
@@ -31,6 +39,8 @@ impl AudioPath {
             sample_rate,
             ic1eq: 0.0,
             ic2eq: 0.0,
+            oversampler: Oversampler::new(),
+            adaa: TanhAdaa::default(),
         }
     }
 
@@ -41,6 +51,8 @@ impl AudioPath {
     pub fn reset(&mut self) {
         self.ic1eq = 0.0;
         self.ic2eq = 0.0;
+        self.oversampler.reset();
+        self.adaa.reset();
     }
 
     /// Cutoff (Hz) implied by `Rf` for the given mode, clamped to a stable range.
@@ -71,21 +83,14 @@ impl AudioPath {
 
     /// Process one sample. `rf` is the live vactrol resistance (ohms).
     #[inline]
-    pub fn process(
-        &mut self,
-        x: f32,
-        rf: f32,
-        mode: Mode,
-        resonance: f32,
-        drive: f32,
-        comp: &Components,
-    ) -> f32 {
+    pub fn process(&mut self, x: f32, rf: f32, params: &Params, comp: &Components) -> f32 {
+        let mode = params.mode;
         let fc = self.cutoff_hz(rf, mode, comp);
         let g = (std::f32::consts::PI * fc / self.sample_rate).tan();
 
         // Damping: resonance 0 -> heavily damped (k = 2), 1 -> near self-osc.
         // Lowpass mode engages the Sallen-Key (C3) path: a touch more resonant.
-        let mut k = (2.0 * (1.0 - resonance)).max(0.02);
+        let mut k = (2.0 * (1.0 - params.resonance)).max(0.02);
         if matches!(mode, Mode::Lowpass) {
             k = (k * 0.8).max(0.02);
         }
@@ -101,8 +106,20 @@ impl AudioPath {
         self.ic2eq = 2.0 * v2 - self.ic2eq;
         let lp = v2;
 
-        // Buffer nonlinearity (Phase 2 wraps this in ADAA + oversampling).
-        let buffered = nonlinear::saturate(lp, drive);
+        // Buffer nonlinearity (memoryless): oversampled, optionally ADAA'd.
+        let drive = params.drive;
+        let buffered = if drive > 0.0 {
+            let factor = params.oversample_factor();
+            let os = &mut self.oversampler;
+            if params.adaa {
+                let adaa = &mut self.adaa;
+                os.process(lp, factor, |s| adaa.process(s, drive))
+            } else {
+                os.process(lp, factor, |s| nonlinear::saturate(s, drive))
+            }
+        } else {
+            lp
+        };
 
         buffered * Self::dc_gain(rf, mode, comp)
     }

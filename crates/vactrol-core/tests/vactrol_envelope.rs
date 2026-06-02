@@ -83,6 +83,8 @@ fn cv_impulse_produces_a_pluck() {
         resonance: 0.0,
         cv_offset: 0.0,
         drive: 0.0, // linear, so the envelope is read cleanly
+        oversample: 2,
+        adaa: true,
     });
 
     let n = (SR * 0.5) as usize;
