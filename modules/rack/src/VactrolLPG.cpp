@@ -17,7 +17,7 @@ extern "C" {
 
 static const int MAX_CHANNELS = 16;
 
-struct VactrolLPG : Module {
+struct VactrolLPG : SBankModule {
     enum ParamId {
         RESONANCE_PARAM,
         DRIVE_PARAM,
@@ -87,11 +87,10 @@ struct VactrolLPG : Module {
     }
 };
 
-struct VactrolLPGWidget : ModuleWidget {
+struct VactrolLPGWidget : SBankModuleWidget {
     VactrolLPGWidget(VactrolLPG* module) {
         setModule(module);
-        setPanel(createPanel(asset::plugin(pluginInstance, "res/VactrolLPG.svg")));
-        // Generated from the panel spec (tools/panelgen) — single source of truth.
+        loadPanels("VactrolLPG");  // black + silver; right-click to toggle.
 #include "VactrolLPG_panel.inc"
     }
 };

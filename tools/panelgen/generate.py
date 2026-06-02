@@ -36,12 +36,12 @@ def build_strike() -> Panel:
         p.knob(x, 42, f"{po}DECAY_PARAM", "DECAY", lo="FAST", hi="SLOW")
         p.knob(x, 60, f"{po}MATERIAL_PARAM", "MATERIAL", lo="HARD", hi="SOFT")
         p.trim(x - 8.5, 73, f"{po}DECAYCV_PARAM", "DEC")
-        p.trim(x + 8.5, 73, f"{po}CTRLCV_PARAM", "CTL")
+        p.trim(x + 8.5, 73, f"{po}CTRLCV_PARAM", "CTRL")
         p.light(x, 82, f"{po}OPEN_LIGHT")
         p.input(x - 9, 93, f"{po}IN_INPUT", "IN")
         p.input(x + 9, 93, f"{po}HIT_INPUT", "HIT")
         p.input(x - 9, 105, f"{po}DECAY_INPUT", "DEC")
-        p.input(x + 9, 105, f"{po}CTRL_INPUT", "CTL")
+        p.input(x + 9, 105, f"{po}CTRL_INPUT", "CTRL")
         p.output(x, 117, f"{po}OUT_OUTPUT", "OUT")
     p.note(40.64, 110.0, "IMPERF", "sm", color="eblue")
     p.switch(40.64, 117, "IMPERFECTION_PARAM")
@@ -71,7 +71,14 @@ def main() -> None:
     for build in (build_strike, build_vactrol):
         p = build()
         print(f"{p.module} ({p.hp} HP, style={p.style}):")
-        p.write(RES / f"{p.module}.svg", SRC / f"{p.module}_panel.inc")
+        # The C++ placement is finish-independent — write it once.
+        (SRC / f"{p.module}_panel.inc").write_text(p.inc())
+        # Emit both finishes so the module can toggle Black/Silver at runtime.
+        for fin, suffix in (("black", ""), ("silver", "-silver")):
+            p.finish = fin
+            (RES / f"{p.module}{suffix}.svg").write_text(p.svg())
+            print(f"  wrote res/{p.module}{suffix}.svg")
+        print(f"  wrote src/{p.module}_panel.inc")
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from strokefont import text_paths, text_width  # labels must be vector paths
+from samefont import text_paths, text_width  # real filled brand fonts (Fira Code / Space Grotesk)
 
 # --- brand kit -------------------------------------------------------------------
 HP_MM = 5.08
@@ -295,10 +295,9 @@ class Panel:
                  f'<stop offset="0.5" stop-color="{t["bg"][1]}"/>'
                  f'<stop offset="1" stop-color="{t["bg"][2]}"/></linearGradient></defs>')
 
-        # 1. environment + border + corner crosshairs
+        # 1. environment + corner crosshairs (full-bleed: no rounded border, which
+        # reads as a weird inset against the rack rails)
         o.append(f'<rect x="0" y="0" width="{w:.2f}" height="{H}" fill="url(#bg)"/>')
-        o.append(self._rrect(0.5, 0.5, w - 1.0, H - 1.0, 1.6, stroke=hair, sw=0.3, op=0.5))
-        o.append(self._rrect(1.4, 1.4, w - 2.8, H - 2.8, 1.2, stroke=hair, sw=0.18, op=0.14))
         for cx, cy in ((4, 4), (w - 4, 4), (4, H - 4), (w - 4, H - 4)):
             o.append(self._line(cx - 1.5, cy, cx + 1.5, cy, hair, 0.22, 0.42))
             o.append(self._line(cx, cy - 1.5, cx, cy + 1.5, hair, 0.22, 0.42))
@@ -327,11 +326,11 @@ class Panel:
             for cx in cols:
                 o.append(self._brackets(cx - 11, 15.5, cx + 11, 121, 0.3))
 
-        # 3. masthead (width-aware)
-        o.append(text_paths("S-", mx, 5.4, 1.9 if narrow else 2.1, orange, "start", weight=0.26))
-        o.append(text_paths("BANK", mx + text_width("S-", 1.9 if narrow else 2.1) + 0.4, 5.4,
-                            1.9 if narrow else 2.1, ink, "start", weight=0.22))
-        o.append(text_paths(self.title, mx, 10.6, 3.4 if narrow else 3.6, ink, "start", weight=0.32))
+        # 3. masthead (width-aware) — wordmark + title in the display face
+        o.append(text_paths("S-", mx, 5.4, 1.9 if narrow else 2.1, orange, "start", display=True))
+        o.append(text_paths("BANK", mx + text_width("S-", 1.9 if narrow else 2.1, display=True) + 0.6, 5.4,
+                            1.9 if narrow else 2.1, ink, "start", display=True))
+        o.append(text_paths(self.title, mx, 10.6, 3.4 if narrow else 3.6, ink, "start", display=True))
         if narrow:
             o.append(text_paths(f"{self.hp}HP", w - mx, 5.4, 1.4, gray, "end", weight=0.18))
             o.append(text_paths(f"S-{self.serial}", w - mx, 10.6, 1.3, gray, "end", weight=0.16))
@@ -360,8 +359,8 @@ class Panel:
                          f'fill="none" stroke="{orange}" stroke-width="0.3" '
                          f'stroke-linecap="round" stroke-linejoin="round"/>')    # signal leaves
         if S.watermark:
-            wm = text_paths("S-", mid, 78, 26, ink, "middle", weight=0.5)
-            o.append(wm.replace('"/>', '" stroke-opacity="0.05"/>'))
+            wm = text_paths("S-", mid, 78, 26, ink, "middle", display=True)
+            o.append(wm.replace("/>", ' fill-opacity="0.05"/>'))
 
         # 5. CV grouping ties (cyan) for DEC/CTL trim pairs
         trims = [c for c in self.comps if c.kind == "trim"]
@@ -422,12 +421,12 @@ class Panel:
         o.append(self._line(mx, H - 6.2, w - mx, H - 6.2, hair, 0.25, 0.34))
         fb = H - 4.0
         if narrow:
-            sw0 = text_width("SAM-E", 1.6)
+            sw0 = text_width("SAM-E", 1.6, display=True)
             o.append(self._circle(mid - sw0 / 2 - 1.6, fb - 0.55, 0.8, fill=orange, fill_op=0.95))
-            o.append(text_paths("SAM-E", mid, fb, 1.6, ink, "middle", weight=0.2))
+            o.append(text_paths("SAM-E", mid, fb, 1.6, ink, "middle", display=True))
         else:
             o.append(text_paths(f"S- {self.hp}HP", mx, fb, 1.45, gray, "start", weight=0.16))
-            o.append(text_paths("SAM-E", mid, fb, 1.6, ink, "middle", weight=0.2))
+            o.append(text_paths("SAM-E", mid, fb, 1.6, ink, "middle", display=True))
             sw = text_width("SIGNAL STABLE", 1.4)
             o.append(self._circle(w - mx - sw - 2.0, fb - 0.55, 0.85, fill=orange, fill_op=0.95))
             o.append(text_paths("SIGNAL STABLE", w - mx, fb, 1.4, gray, "end", weight=0.16))

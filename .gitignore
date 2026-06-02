@@ -10,3 +10,7 @@
 /modules/rack/plugin.so
 /modules/rack/*.vcvplugin
 /docs/superpowers/
+
+# Python
+__pycache__/
+*.pyc

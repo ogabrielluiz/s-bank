@@ -14,7 +14,7 @@ extern "C" {
 #include "../s_bank.h"
 }
 
-struct Strike : Module {
+struct Strike : SBankModule {
     enum ParamId {
         A_OPEN_PARAM, A_DECAY_PARAM, A_MATERIAL_PARAM, A_DECAYCV_PARAM, A_CTRLCV_PARAM,
         B_OPEN_PARAM, B_DECAY_PARAM, B_MATERIAL_PARAM, B_DECAYCV_PARAM, B_CTRLCV_PARAM,
@@ -111,13 +111,11 @@ struct Strike : Module {
     }
 };
 
-struct StrikeWidget : ModuleWidget {
+struct StrikeWidget : SBankModuleWidget {
     StrikeWidget(Strike* module) {
         setModule(module);
-        setPanel(createPanel(asset::plugin(pluginInstance, "res/Strike.svg")));
-        // Component placement is generated from the panel spec (tools/panelgen) so the
-        // SVG art and these positions can never drift. Regenerate: python3
-        // tools/panelgen/generate.py
+        loadPanels("Strike");  // black + silver; toggle via right-click. Component
+        // placement is generated from the panel spec (tools/panelgen) — zero drift.
 #include "Strike_panel.inc"
     }
 };
