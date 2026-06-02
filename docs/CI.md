@@ -4,14 +4,17 @@
 > (`smoke.yml`, `pr.yml`, `nightly.yml`, `release.yml`) — those files are the
 > source of truth. This document is the design rationale and tier reference.
 >
-> Three things were corrected versus the original draft so the committed CI is
+> Four things were corrected versus the original draft so the committed CI is
 > actually green: `smoke` runs the existing fast tests
 > (`stability` / `no_alloc` / `vactrol_envelope`) rather than a non-existent
 > `smoke` test; `pr`'s bench-gate is a dependency-free `cargo bench --no-run`
 > compile check until a CodSpeed `criterion-compat` shim is added (then the
-> instruction-count + wall-clock gate below becomes opt-in); and the fast-math
-> matrix uses `-Cllvm-args=-fp-contract=fast` (the `-ffast-math` in the draft is a
-> clang flag that `rustc` rejects).
+> instruction-count + wall-clock gate below becomes opt-in); the fast-math matrix
+> uses `-Cllvm-args=-fp-contract=fast` (the `-ffast-math` in the draft is a clang
+> flag that `rustc` rejects); and the aarch64 cross-build sets
+> `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc` so the
+> cross objects link with the cross gcc rather than the host `cc`. All four were
+> caught by watching the first Actions run, not just local checks.
 
 The core principle (Part D of the report): **the DSP core has no VCV Rack SDK
 dependency**, so the entire test and bench suite runs headless. No core job
@@ -45,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: ${{ matrix.fastmath }}
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
