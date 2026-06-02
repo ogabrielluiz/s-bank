@@ -18,17 +18,25 @@ audio in -----------------------------------------> audio_path (TPT 2-pole) --> 
   from Parker & D'Angelo.
 - **vactrol**: target resistance from the datasheet power law `Rf = A/If^1.4 + B`,
   followed by an asymmetric, state-dependent one-pole (fast attack, slow decay).
-- **audio_path**: topology-preserving (TPT/ZDF) 2-pole state-variable filter, one
-  linear solve per sample. `Rf` sets the cutoff (Both/Lowpass) and, via the
-  potential divider `Rα/(Rα+2·Rf)`, the DC gain. Modes: Both (couples brightness
-  and amplitude), VCA (amplitude gate), Lowpass (Sallen-Key filter).
+- **audio_path**: a topology-preserving **nodal circuit model** of the 292-style
+  passive vactrol ladder (`Vin -Rf- n1 -Rf- n2`, shunt caps C1/C2, terminating Rα,
+  optional C3 bridge in Lowpass mode). Each capacitor is a trapezoidal companion
+  model (conductance `2C/T` plus a history current source); the two node voltages
+  come from a 2x2 modified-nodal-analysis solve per sample. The DC divider
+  `Rα/(Rα+2·Rf)` (Eq. 12) falls out of the solve exactly in all three modes.
+  Resonance is the Sallen-Key mechanism: the C1 return is a buffered, gained copy
+  of the output (`Vfb = K·f(Vout)`), so the buffer nonlinearity sits inside the
+  feedback loop; `K = 1 + 2·C2/C1` is the self-oscillation threshold. Modes select
+  Rα (5 MΩ Both/Lowpass, 5 kΩ VCA) and C3 engagement.
 
-## Why TPT and not a direct-form transfer function
+## Why a companion-model solve and not a direct-form transfer function
 
 The direct-form bilinear transfer function collapses the three capacitor states
-to two and **diverges under fast modulation**. The TPT structure preserves the
-states and is stable under any rate of modulation. `tests/stability.rs` is the
-guard for this property.
+to two and **diverges under fast modulation**. The companion-model MNA keeps all
+three states (one per cap), and its conductance matrix is passive, so the
+per-sample solve is unconditionally stable at any modulation rate with no cutoff
+clamp. `tests/stability.rs` guards this; the DC-divider identity is verified
+against Eq. 12 directly.
 
 ## Status
 
@@ -47,13 +55,19 @@ guard for this property.
 
 ## Antialiasing notes
 
-The buffer `tanh` sits at the audio-path output (memoryless, outside the
-resonance feedback), so first-order ADAA is exact here, not an approximation.
-Oversampling targets that same memoryless stage: the linear SVF runs at the base
-rate (it generates no aliasing). When `drive == 0` the nonlinear stage is bypassed
-so the linear path has no oversampling latency. Measured aliasing for the
-recommended 2x+ADAA config is ~ -42 dB rel fundamental on a 9 kHz full-scale tone
-at drive 5 (`tests/spectral.rs`), with 4x improving on that.
+The buffer `tanh` sits **inside** the resonance feedback loop (the Sallen-Key C1
+return). It is evaluated on the previous (oversampled) output, so the MNA matrix
+stays passive and the per-sample solve stays linear and well-posed; the explicit
+one-sample feedback is the modelling approximation. Antialiasing comes from
+oversampling the whole feedback solve (the halfband runs the ladder `factor` times
+per output sample at the finer timestep), with first-order ADAA on the buffer as
+an additional reduction. Measured aliasing for the recommended 2x+ADAA config is
+~ -61 dB rel fundamental on a 9 kHz full-scale tone at drive 5 (`tests/spectral.rs`).
+
+This is a deliberate trade: the explicit (delayed) feedback keeps the solve cheap
+and robust. Replacing it with instantaneous linearisation of the tanh around the
+previous operating point (the paper's Taylor approach) would tighten the loop at
+the cost of a per-sample relinearisation; that is the documented upgrade path.
 
 ## References
 

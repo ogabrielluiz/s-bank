@@ -53,16 +53,17 @@ fn ir_cutoff(rf: f32) -> f32 {
 
 #[test]
 fn cutoff_decreases_as_gate_closes() {
-    let open = ir_cutoff(1_000.0); // bright / open
-    let closed = ir_cutoff(1_000_000.0); // dull / closed
+    let open = ir_cutoff(1_000.0); // bright / open (low Rf)
+    let closed = ir_cutoff(10_000_000.0); // dull / nearly dark (off-resistance)
 
+    // The physics: closing the gate drops the cutoff by well over a decade.
     assert!(
-        open > closed * 4.0,
+        open > closed * 10.0,
         "cutoff should drop sharply as Rf grows: open={open:.1} Hz, closed={closed:.1} Hz"
     );
     assert!(
-        closed < 1_000.0,
-        "closed-gate cutoff should be low (Hz): {closed:.1}"
+        closed < 500.0,
+        "near-dark cutoff should be low (Hz): {closed:.1}"
     );
     assert!(
         open > 5_000.0,

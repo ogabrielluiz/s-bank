@@ -110,9 +110,10 @@ fn oversampling_and_adaa_reduce_aliasing() {
     );
     assert!(os4_adaa <= os2_adaa + 1.0, "4x should be no worse than 2x");
 
-    // Locked regression bar for the recommended config (empirical). 2x + ADAA on
-    // a 9 kHz full-scale sine through a tanh at drive 5 measures ~ -42.5 dB with
-    // the 61-tap halfband; -40 dB leaves a little headroom for platform variation.
+    // Locked regression bar for the recommended config (empirical). With the
+    // in-loop nonlinearity and the 61-tap halfband, 2x + ADAA measures ~ -61 dB
+    // rel fundamental on a 9 kHz full-scale tone at drive 5; -40 dB leaves ample
+    // headroom for platform variation while still catching real regressions.
     assert!(
         os2_adaa < -40.0,
         "2x+ADAA aliasing should sit below -40 dB, got {os2_adaa:.1}"
