@@ -34,13 +34,26 @@ guard for this property.
 
 - **Phase 0**: workspace scaffolding. Done.
 - **Phase 1**: DSP core + vactrol model + tests. Done.
-- **Phase 2**: ADAA + 2x oversampling. Stubs in `nonlinear.rs` / `oversample.rs`.
-- **Phase 3**: imperfection layer. Seeded shell in `imperfection.rs`.
-- **Phases 4-7**: test/bench/CI tiers and the VCV adapter.
+- **Phase 2**: first-order ADAA + polyphase halfband oversampling (1x/2x/4x) +
+  spectral/aliasing tests. Done.
+- **Phase 3**: imperfection layer (per-instance tolerance, drift, thermal, noise
+  floor), seedable and serializable. Done.
+- **Phase 4**: golden-file management (`reference` module, `bless`, tolerance
+  comparison) + smoke/correctness/spectral tests. Done.
+- **Phase 5**: benchmark suite (per-config, voices, worst-case vs typical). Done.
+- **Phase 6**: tiered CI design documented in `docs/CI.md` (YAML ready to add;
+  see the note there about the `workflows` permission).
+- **Phase 7**: VCV adapter. Placeholder only (`vcv-adapter/`).
 
-CI workflows (Phase 6) will be added under `.github/workflows/` as a tiered set
-(smoke / pr / nightly / release), with the core suite running headless and no
-Rack SDK in any core job.
+## Antialiasing notes
+
+The buffer `tanh` sits at the audio-path output (memoryless, outside the
+resonance feedback), so first-order ADAA is exact here, not an approximation.
+Oversampling targets that same memoryless stage: the linear SVF runs at the base
+rate (it generates no aliasing). When `drive == 0` the nonlinear stage is bypassed
+so the linear path has no oversampling latency. Measured aliasing for the
+recommended 2x+ADAA config is ~ -42 dB rel fundamental on a 9 kHz full-scale tone
+at drive 5 (`tests/spectral.rs`), with 4x improving on that.
 
 ## References
 

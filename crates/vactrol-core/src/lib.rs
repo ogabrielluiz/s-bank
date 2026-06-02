@@ -22,6 +22,7 @@ pub mod imperfection;
 pub mod nonlinear;
 pub mod oversample;
 pub mod params;
+pub mod reference;
 pub mod vactrol;
 
 pub use imperfection::{Imperfection, ImperfectionConfig, DEFAULT_SEED};

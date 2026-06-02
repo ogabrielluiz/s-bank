@@ -1,29 +1,139 @@
-//! Minimal benchmark scaffold (Phase 5 expands this into ns/sample, 1-vs-16-voice
-//! SIMD scaling, per-oversampling-factor, ADAA on/off, and worst-case inputs,
-//! imported as `criterion` and backed by `codspeed-criterion-compat`).
+//! Benchmark suite. Imported as `criterion`; under `cargo codspeed` this is the
+//! `codspeed-criterion-compat` shim (Phase 6 wires that in CI). Throughput is set
+//! per element so Criterion reports time-per-sample directly.
+//!
+//! Coverage: per-oversampling-factor and ADAA on/off cost; imperfection on/off;
+//! 1 vs 16 voices (scalar today -- the lane-parametric SIMD path that makes ~4
+//! voices cost ~1 is a later phase); and an explicit worst-case input alongside
+//! the typical case, since the real-time guarantee is about the worst case.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use vactrol_core::{Lpg, Mode, Params};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use vactrol_core::{ImperfectionConfig, Lpg, Mode, Params};
 
-fn bench_process_block(c: &mut Criterion) {
-    let mut lpg = Lpg::new(48_000.0);
-    lpg.set_params(Params {
+const SR: f32 = 48_000.0;
+const BLOCK: usize = 512;
+
+fn lpg(oversample: u8, adaa: bool, imperfection: bool, drive: f32) -> Lpg {
+    let mut l = Lpg::new(SR);
+    l.set_params(Params {
         mode: Mode::Both,
         resonance: 0.5,
         cv_offset: 0.0,
-        drive: 1.0,
-        oversample: 2,
-        adaa: true,
+        drive,
+        oversample,
+        adaa,
     });
-
-    let audio: Vec<f32> = (0..512).map(|i| (i as f32 * 0.1).sin()).collect();
-    let cv = vec![5.0f32; 512];
-    let mut out = vec![0.0f32; 512];
-
-    c.bench_function("process_block_512", |b| {
-        b.iter(|| lpg.process_block(black_box(&audio), black_box(&cv), &mut out));
-    });
+    if imperfection {
+        l.set_imperfection(ImperfectionConfig {
+            enabled: true,
+            ..Default::default()
+        });
+    }
+    l
 }
 
-criterion_group!(benches, bench_process_block);
+/// A musically typical input: a tone with an occasional gate.
+fn typical_input() -> (Vec<f32>, Vec<f32>) {
+    let audio: Vec<f32> = (0..BLOCK)
+        .map(|i| (std::f32::consts::TAU * 220.0 * i as f32 / SR).sin())
+        .collect();
+    let cv: Vec<f32> = (0..BLOCK).map(|i| if i < 16 { 8.0 } else { 0.0 }).collect();
+    (audio, cv)
+}
+
+/// Worst case: full-scale rapidly-alternating audio (maximizes the nonlinear work
+/// and avoids the cheap ADAA fallback branch) with audio-rate CV slamming the
+/// gate, so every sample does the full lncosh + filter work.
+fn worst_input() -> (Vec<f32>, Vec<f32>) {
+    let audio: Vec<f32> = (0..BLOCK)
+        .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+        .collect();
+    let cv: Vec<f32> = (0..BLOCK)
+        .map(|i| 10.0 * (std::f32::consts::TAU * 8_000.0 * i as f32 / SR).sin())
+        .collect();
+    (audio, cv)
+}
+
+fn bench_configs(c: &mut Criterion) {
+    let mut g = c.benchmark_group("config");
+    g.throughput(Throughput::Elements(BLOCK as u64));
+    let (audio, cv) = typical_input();
+    let mut out = vec![0.0f32; BLOCK];
+    for (name, os, adaa) in [
+        ("1x_noadaa", 1u8, false),
+        ("1x_adaa", 1, true),
+        ("2x_adaa", 2, true),
+        ("4x_adaa", 4, true),
+    ] {
+        let mut l = lpg(os, adaa, false, 2.0);
+        g.bench_function(name, |b| {
+            b.iter(|| l.process_block(black_box(&audio), black_box(&cv), &mut out))
+        });
+    }
+    g.finish();
+}
+
+fn bench_imperfection(c: &mut Criterion) {
+    let mut g = c.benchmark_group("imperfection");
+    g.throughput(Throughput::Elements(BLOCK as u64));
+    let (audio, cv) = typical_input();
+    let mut out = vec![0.0f32; BLOCK];
+    for (name, imp) in [("off", false), ("on", true)] {
+        let mut l = lpg(2, true, imp, 2.0);
+        g.bench_function(name, |b| {
+            b.iter(|| l.process_block(black_box(&audio), black_box(&cv), &mut out))
+        });
+    }
+    g.finish();
+}
+
+fn bench_voices(c: &mut Criterion) {
+    let mut g = c.benchmark_group("voices");
+    let (audio, cv) = typical_input();
+    let mut out = vec![0.0f32; BLOCK];
+
+    g.throughput(Throughput::Elements(BLOCK as u64));
+    let mut one = lpg(2, true, false, 2.0);
+    g.bench_function("x1", |b| {
+        b.iter(|| one.process_block(black_box(&audio), black_box(&cv), &mut out))
+    });
+
+    g.throughput(Throughput::Elements(16 * BLOCK as u64));
+    let mut many: Vec<Lpg> = (0..16).map(|_| lpg(2, true, false, 2.0)).collect();
+    g.bench_function("x16_scalar", |b| {
+        b.iter(|| {
+            for l in many.iter_mut() {
+                l.process_block(black_box(&audio), black_box(&cv), &mut out);
+            }
+        })
+    });
+    g.finish();
+}
+
+fn bench_worst_vs_typical(c: &mut Criterion) {
+    let mut g = c.benchmark_group("worst_vs_typical");
+    g.throughput(Throughput::Elements(BLOCK as u64));
+    let mut out = vec![0.0f32; BLOCK];
+
+    let (ta, tc) = typical_input();
+    let mut l1 = lpg(4, true, true, 4.0);
+    g.bench_function("typical_4x_imperf", |b| {
+        b.iter(|| l1.process_block(black_box(&ta), black_box(&tc), &mut out))
+    });
+
+    let (wa, wc) = worst_input();
+    let mut l2 = lpg(4, true, true, 4.0);
+    g.bench_function("worst_4x_imperf", |b| {
+        b.iter(|| l2.process_block(black_box(&wa), black_box(&wc), &mut out))
+    });
+    g.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_configs,
+    bench_imperfection,
+    bench_voices,
+    bench_worst_vs_typical
+);
 criterion_main!(benches);

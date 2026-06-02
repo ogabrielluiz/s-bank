@@ -1,4 +1,31 @@
 {
-  "note": "Golden buffers land in Phase 4. Each entry records seed, sample rate, toolchain, and platform.",
-  "goldens": []
+  "arch": "x86_64",
+  "case_len": 4800,
+  "crate_version": "0.1.0",
+  "goldens": [
+    {
+      "len": 4800,
+      "name": "pluck_both",
+      "rms": 0.13444866240024567
+    },
+    {
+      "len": 4800,
+      "name": "vca_tone",
+      "rms": 0.20468083024024963
+    },
+    {
+      "len": 4800,
+      "name": "lowpass_sweep",
+      "rms": 0.5283797979354858
+    },
+    {
+      "len": 4800,
+      "name": "imperfection_on",
+      "rms": 0.1399291306734085
+    }
+  ],
+  "note": "Tolerance-compared golden buffers. Regenerate with `cargo run -p vactrol-harness -- bless`.",
+  "os": "linux",
+  "ref_seed": 12648430,
+  "sample_rate": 48000.0
 }
