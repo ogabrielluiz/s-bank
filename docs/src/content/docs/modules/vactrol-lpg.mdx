@@ -83,12 +83,14 @@ The module's per-sample loop is just these calls (see `modules/rack/src/VactrolL
 the headless example in `modules/rack/test/dsp_smoke.cpp`):
 
 ```cpp
-#include "dsp/SBankDSP.hpp"
+#include <sbank/sbank_dsp.hpp>
 
 sbank::VactrolLpg lpg(48000.f);
-// setParams(mode, resonance, cvOffset, drive, oversample)
-//   mode: 0 = Both, 1 = VCA, 2 = Lowpass    oversample: 1 / 2 / 4
-lpg.setParams(0, 0.2f, 0.f, 1.f, 2);
+
+sbank::LpgParams p;                  // defaults: Both, resonance 0.2, drive 1, 2x oversample
+p.mode = sbank::LpgMode::Both;       // or LpgMode::Vca / LpgMode::Lowpass
+p.oversample = 2;                    // 1 / 2 / 4
+lpg.setParams(p);                    // or the shim: lpg.setParams(0, 0.2f, 0.f, 1.f, 2);
 
 for (int i = 0; i < n; ++i) {
     float cv = (i < 12000) ? 8.f : 0.f;   // short "trigger": open, then bloom shut

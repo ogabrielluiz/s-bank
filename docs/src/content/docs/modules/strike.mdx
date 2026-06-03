@@ -84,10 +84,13 @@ analog drift)**. That setting is saved with the patch.
 The panel is a thin wrapper; here is the same voice headless, no Rack SDK in sight:
 
 ```cpp
-#include "dsp/SBankDSP.hpp"
+#include <sbank/sbank_dsp.hpp>
 
 sbank::StrikeCore strike(48000.f);          // sample rate
-strike.setParams(/*open=*/0.f, /*decay=*/0.5f, /*material=*/0.f);
+
+sbank::StrikeParams p;                      // open=0, decay=0.4, material=0 by default
+p.decay = 0.5f;
+strike.setParams(p);                        // or the shim: strike.setParams(0.f, 0.5f, 0.f);
 
 float peak = 0.f;
 for (int i = 0; i < 96000; ++i) {
@@ -102,8 +105,8 @@ for (int i = 0; i < 96000; ++i) {
 
 1. Construct a `StrikeCore` with your sample rate (and optionally a seed for the drift).
 
-2. Call `setParams(open, decay, material)` whenever a control changes — all three are
-   normalized 0..1, matching the panel's faders and knob.
+2. Call `setParams(StrikeParams{...})` whenever a control changes — `open`, `decay`, and
+   `material` are all normalized 0..1, matching the panel's faders and knob.
 
 3. Per sample, call `processSample(audioIn, ctrl01, decayMod, hitV)`: the audio in (the
    panel feeds a DC normal when IN is unpatched), the 0..1 control level, an additive decay

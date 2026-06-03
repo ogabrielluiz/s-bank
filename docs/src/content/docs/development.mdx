@@ -57,10 +57,10 @@ loops touch the header and never build the plugin at all.
 A minimal headless use of the library reads the same in any project:
 
 ```cpp
-#include "dsp/SBankDSP.hpp"
+#include <sbank/sbank_dsp.hpp>
 
 sbank::VactrolLpg lpg(48000.f);
-lpg.setParams(/*mode*/ 0, /*resonance*/ 0.2f, /*cvOffset*/ 0.f, /*drive*/ 1.f, /*os*/ 2);
+lpg.setParams(sbank::LpgParams{});            // named struct; defaults = Both, res 0.2, 2x
 float y = lpg.processSample(audioIn, cvIn);   // audio in ±1, cv in volts
 ```
 

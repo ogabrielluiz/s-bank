@@ -12,18 +12,25 @@ dependency**: the header pulls in `<algorithm>`, `<array>`, `<cmath>`, `<cstdint
 module, a plugin, a command-line renderer, or a test harness.
 
 ```cpp
-#include "dsp/SBankDSP.hpp"
+#include <sbank/sbank_dsp.hpp>   // canonical, stable include
 ```
 
-That is the whole installation: copy the header (or vendor the `dsp/` directory) into your
-build, include it, and use the types below. The demo modules `Strike` and `VactrolLPG` are
-thin Rack adapters over exactly these classes — they exist to prove the library, not to be it.
+That is the whole installation: copy the header into your build, add its directory to your
+include path (`-I`), and use the types below. `<sbank/sbank_dsp.hpp>` is a thin forwarding
+header over the real implementation in `modules/rack/src/dsp/SBankDSP.hpp` (inside this repo
+the demos include the latter directly). The demo modules `Strike` and `VactrolLPG` are thin
+Rack adapters over exactly these classes — they exist to prove the library, not to be it.
 
-<Aside type="caution" title="The setParams API is positional today">
-  Every voice configures itself through a positional `setParams(...)` of bare `float`/`int`
-  arguments — no named struct, no units in the type system. This is a known rough edge: the
-  argument order matters and the compiler will not catch a swap. Read the lists below
-  carefully, and keep your call site close to this page until the API grows named parameters.
+The header carries its own version: `SBANK_DSP_VERSION_MAJOR` / `_MINOR` / `_PATCH` (and the
+combined `SBANK_DSP_VERSION`) let a vendored copy branch on the library version.
+
+<Aside type="tip" title="Configure with a typed struct">
+  Every voice takes a named parameter struct — `setParams(const LpgParams&)`,
+  `setParams(const StrikeParams&)` — so each field is named and unit-annotated, and a swapped
+  argument is a compile error rather than a silent wrong sound. Enum overloads
+  (`setParams(LpgMode, ...)`) and the original positional `setParams(...)` of bare floats are
+  kept as shims for existing call sites, but new code should reach for the struct.
+  `getParams()` reads the active values back.
 </Aside>
 
 ## VactrolLpg — the Buchla-292 vactrol gate
@@ -37,25 +44,33 @@ bloomed release, and a state-space audio cell with optional oversampling.
 1. **Construct** with the sample rate (defaults to `48000.f`):
    `sbank::VactrolLpg lpg(sampleRate);`
 
-2. **Configure** with `setParams(mode, resonance, cvOffset, drive, oversample)`.
+2. **Configure** with `setParams(const LpgParams&)` — a named struct (or the
+   `setParams(LpgMode, ...)` overload).
 
 3. **Run** one sample at a time through `processSample(audioIn, cvIn)`.
 
 </Steps>
 
-`setParams(uint32_t mode, float resonance, float cvOffset, float drive, uint32_t oversample)`:
+`LpgParams` is the configuration struct; the table is its fields, and the defaults shown are
+exactly what a default-constructed `LpgParams` holds:
 
-| Arg | Type | Meaning | Range / units |
-|-----|------|---------|---------------|
-| `mode` | `uint32_t` | `0` = Both (LPG), `1` = VCA only, `2` = Lowpass only | 0, 1, or 2 |
-| `resonance` | `float` | Audio-cell resonance | 0.0 – 1.0 (clamped) |
-| `cvOffset` | `float` | DC added to the incoming CV before the control model | volts |
-| `drive` | `float` | `tanh` drive into the cell; `0` disables the nonlinearity | ~0.0 – 8.0 |
-| `oversample` | `uint32_t` | Requested oversampling; clamped to 4, then mapped to a 1× / 2× / 4× factor | 1, 2, or 4 |
+| Field | Type | Meaning | Default · range |
+|-------|------|---------|-----------------|
+| `mode` | `LpgMode` | `LpgMode::Both` (LPG), `Vca`, or `Lowpass` | `Both` |
+| `resonance` | `float` | Audio-cell resonance | `0.2` · 0.0 – 1.0 (clamped) |
+| `cvOffset` | `float` | DC added to the incoming CV before the control model | `0.0` volts |
+| `drive` | `float` | `tanh` drive into the cell; `0` disables the nonlinearity | `1.0` · ~0.0 – 8.0 |
+| `oversample` | `uint32_t` | Requested oversampling; `oversampleFactor()` snaps it to 1× / 2× / 4× | `2` · 1, 2, or 4 |
 
 ```cpp
 sbank::VactrolLpg lpg(48000.f);
-lpg.setParams(0, 0.2f, 0.f, 1.f, 2);     // Both mode, 2x oversample
+
+sbank::LpgParams p;               // starts at the defaults above
+p.mode = sbank::LpgMode::Both;
+p.resonance = 0.2f;
+p.oversample = 2;                 // 2x
+lpg.setParams(p);
+// equivalently: lpg.setParams(sbank::LpgMode::Both, 0.2f, /*cvOffset*/ 0.f, /*drive*/ 1.f, 2);
 
 for (int i = 0; i < 48000; ++i) {
     float x  = std::sin(2.f * sbank::kPi * 220.f * i / 48000.f); // audio, nominal +-1.0
@@ -69,6 +84,11 @@ for (int i = 0; i < 48000; ++i) {
 meter or a scope. Call `lpg.reset()` to clear the cell state, the smoother, and the vactrol
 back to its dark (fully closed) resistance.
 
+To change the *analog character* — the capacitor values, the vactrol power law and its time
+constants — pass an `LpgComponents` to `lpg.setComponents(...)` (`getComponents()` reads it
+back). The defaults are the datasheet/reference values the golden regression pins, so the
+out-of-the-box sound is unchanged until you deliberately override them.
+
 ## StrikeCore — the clean, zero-bleed gate
 
 `sbank::StrikeCore` is the inverse philosophy: a shaped envelope drives a clean state-variable
@@ -79,20 +99,20 @@ gate that bleeds nothing when closed, with an always-available analog-drift laye
 1. **Construct** with the sample rate and an optional 64-bit seed for the drift RNGs:
    `sbank::StrikeCore strike(sampleRate);`
 
-2. **Configure** the voice with `setParams(open, decay, material)`, and optionally the drift
-   with `setImperfection(enabled, noiseAmp, driftAmount)`.
+2. **Configure** the voice with `setParams(const StrikeParams&)`, and optionally the drift with
+   `setImperfection(const StrikeImperfectionConfig&)`.
 
 3. **Run** one sample through `processSample(audioIn, ctrl01, decayMod, hitV)`.
 
 </Steps>
 
-`setParams(float open, float decay, float material)`:
+`StrikeParams` is the configuration struct (default-constructed values in the last column):
 
-| Arg | Type | Meaning | Range / units |
-|-----|------|---------|---------------|
-| `open` | `float` | Gate floor — minimum openness even with no hit | 0.0 – 1.0 |
-| `decay` | `float` | Envelope decay; longer ring as it rises | 0.0 – 1.0 |
-| `material` | `float` | Hard → soft: sets attack time, cutoff ceiling, and level | 0.0 – 1.0 |
+| Field | Type | Meaning | Default · range |
+|-------|------|---------|-----------------|
+| `open` | `float` | Gate floor — minimum openness even with no hit | `0.0` · 0.0 – 1.0 |
+| `decay` | `float` | Envelope decay; longer ring as it rises | `0.4` · 0.0 – 1.0 |
+| `material` | `float` | Hard → soft: sets attack time, cutoff ceiling, and level | `0.0` · 0.0 – 1.0 |
 
 `processSample(float audioIn, float ctrl01, float decayMod, float hitV)`:
 
@@ -105,7 +125,10 @@ gate that bleeds nothing when closed, with an always-available analog-drift laye
 
 ```cpp
 sbank::StrikeCore strike(48000.f);
-strike.setParams(0.f, 0.5f, 0.f);          // open=0, decay=0.5, material=hard
+
+sbank::StrikeParams p;                      // open=0, decay=0.4, material=0 by default
+p.decay = 0.5f;
+strike.setParams(p);                        // or: strike.setParams(0.f, 0.5f, 0.f);
 
 for (int i = 0; i < 96000; ++i) {
     float hit = i < 10 ? 5.f : 0.f;        // a brief trigger edge, in volts
@@ -116,8 +139,16 @@ for (int i = 0; i < 96000; ++i) {
 
 Feeding a DC level into `audioIn` (here `1.f`) with no other source makes a `hitV` edge emit
 the raw envelope — a percussive ping — which is exactly how Strike's `IN` jack is normalled in
-the Rack adapter. `setImperfection(true, 1.0e-4f, 1.f)` turns on the seeded drift and
-pink-noise floor; `reset()` clears the envelope, gate, pitch tracker, and drift state.
+the Rack adapter. To turn on the seeded drift and pink-noise floor, set the fields of a
+`StrikeImperfectionConfig` and pass it:
+
+```cpp
+sbank::StrikeImperfectionConfig dirt;   // enabled=false, noiseAmp=1e-4, driftAmount=1.0
+dirt.enabled = true;
+strike.setImperfection(dirt);           // or the shim: strike.setImperfection(true, 1e-4f, 1.f);
+```
+
+`reset()` clears the envelope, gate, pitch tracker, and drift state.
 
 ## Signal conventions
 
@@ -145,10 +176,14 @@ The per-sample path is written to be audio-thread safe. Honoring this contract i
   only stores values and (for the vactrol) maps the oversample factor.
 - **`reset()` clears all internal state.** Use it on patch reset or voice steal to silence
   ringing tails and return the vactrol to its dark resistance. It does not allocate.
+- **Non-finite inputs are scrubbed.** Every `processSample` replaces a NaN/Inf input with `0`
+  before it can reach the recursive state, so a bad sample upstream can't poison the filter.
 
 <Aside type="note">
-  There is no `processBlock`. You drive these voices one sample at a time, which is what makes
-  the state-space and oversampled cells exact. Wrap them in your own block loop.
+  Each voice also offers `processBlock(...)`, a convenience that loops `processSample` over
+  length-`n` buffers — a trivially-correct wrapper, not a vectorised fast path. The per-sample
+  call is the exact one (it is what keeps the state-space and oversampled cells exact); reach
+  for `processBlock` only where a buffer-at-a-time call site reads more cleanly.
 </Aside>
 
 ## The building blocks
