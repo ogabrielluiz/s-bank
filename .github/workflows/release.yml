@@ -1,7 +1,7 @@
 name: release
 
 # Builds the .vcvplugin for every platform and attaches them to a GitHub Release.
-#   - Push a tag matching the plugin.json version, e.g. `git tag v2.0.0 && git push --tags`.
+#   - Push a tag matching the plugin.json version, e.g. `git tag v0.1.0 && git push --tags`.
 #   - Or run manually (workflow_dispatch) to build all platforms WITHOUT publishing.
 # Windows + Linux are cross-compiled in the rack-plugin-toolchain container; macOS
 # (x64 + arm64) is built natively on a macOS runner against the Rack SDK.

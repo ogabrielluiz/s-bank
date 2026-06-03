@@ -59,7 +59,7 @@ body:
     attributes:
       label: S-Bank version
       description: Right-click the module → the plugin version, or the .vcvplugin filename.
-      placeholder: e.g. 2.0.0
+      placeholder: e.g. 0.1.0
   - type: textarea
     id: logs
     attributes:
