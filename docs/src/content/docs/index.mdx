@@ -1,0 +1,61 @@
+---
+title: S-Bank
+description: "A library of analog-emulation DSP building blocks for VCV Rack modules."
+---
+
+import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+**S-Bank** is a library of **analog-emulation DSP building blocks** — reusable C++ that gives
+VCV Rack modules (and other audio software) convincing analog behaviour and sound. It models
+*circuits*, not just filter sweeps: vactrol cells, state-space gates, envelopes, oversampling,
+and seeded analog drift, ready to compose into your own instruments.
+
+The library is the product. It ships with two **demo modules** that prove it works and show
+how — but the point is the blocks underneath them.
+
+<CardGrid>
+  <LinkCard
+    title="Use the library"
+    href={import.meta.env.BASE_URL + 'library'}
+    description="Drop the header into your project, construct a voice, and process samples. Header-only C++, no Rack-SDK dependency."
+  />
+  <LinkCard
+    title="Source on GitHub"
+    href="https://github.com/ogabrielluiz/s-bank"
+    description="Code, releases, and issues."
+  />
+</CardGrid>
+
+## Why it's analog
+
+The library models the underlying circuit, so the analog character is inherent — not an
+envelope or EQ bolted on after the fact:
+
+- The **vactrol cell** is the Parker &amp; D'Angelo state-space Buchla-292 model — the
+  opto-isolator's slow attack and long, bloomed release fall out of the model itself.
+- The **clean gate** is its inverse: zero-bleed when closed, driven by a shaped envelope,
+  with a whisper of seeded drift so "clean" never tips into "sterile."
+
+<Aside type="note">
+  Everything is native, header-only C++ with **no VCV-Rack-SDK dependency**, so it tests and
+  runs headless — drop it into any audio project, not just Rack.
+</Aside>
+
+## The demo modules
+
+Two modules ship in the box to demonstrate the library in VCV Rack:
+
+<CardGrid>
+  <LinkCard
+    title="Strike"
+    href={import.meta.env.BASE_URL + 'modules/strike'}
+    description="A dual, clean, zero-bleed envelope-driven low-pass gate — built on the clean-gate blocks."
+  />
+  <LinkCard
+    title="Vactrol LPG"
+    href={import.meta.env.BASE_URL + 'modules/vactrol-lpg'}
+    description="A Buchla-292-style vactrol gate — built on the vactrol cell. Low-pass / VCA / combined."
+  />
+</CardGrid>
+
+Want to *hear* them first? See [Install the demo plugin](installation).

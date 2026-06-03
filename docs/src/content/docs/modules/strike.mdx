@@ -1,0 +1,134 @@
+---
+title: Strike
+description: "A demo module — a dual, clean, zero-bleed envelope-driven low-pass gate built on the library's clean-gate blocks."
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+**Strike** is a **demo module**, not the product. It exists to drive the library's
+clean-gate blocks inside VCV Rack and show how they behave under a panel — the reusable
+C++ underneath is what S-Bank ships. Everything the panel does, it does by feeding
+`sbank::StrikeCore`; nothing in the sound lives in the Rack layer.
+
+The clean gate is the inverse of the [vactrol cell](modules/vactrol-lpg): zero bleed when
+closed, driven by a shaped envelope rather than an opto-isolator, with a whisper of seeded
+drift so "clean" never tips into "sterile." Each strike fires a fast/slow envelope pair
+into a TPT state-variable low-pass; **Material** morphs the attack and cutoff ceiling from
+hard to soft, and a built-in pitch tracker stretches longer notes' decays so they ring in
+proportion.
+
+<Aside type="note">
+  The voice is `sbank::StrikeCore` — header-only C++ with **no VCV-Rack-SDK dependency**.
+  The same construct/`setParams`/`processSample` sequence the panel runs is what you call
+  from any audio project. See the [library reference](library) for the building blocks.
+</Aside>
+
+## At a glance
+
+Strike is **dual** — two independent channels, **A** and **B**, mirrored on a 16 HP panel —
+and each channel is **polyphonic** (up to 16 voices). A channel's voice count follows its
+audio **IN** and **HIT** inputs, and **OUT** matches that channel count.
+
+## Controls
+
+Per channel, top to bottom:
+
+- **OPEN** — a fader setting the gate floor: how far open the gate sits at rest, before any
+  hit. At 0% the channel is silent until struck; raise it to bleed a continuous level
+  through.
+- **DECAY** — a fader setting how long the gate rings out after a hit. The openness **meter**
+  rises in the gap **between** the OPEN and DECAY faders: it fills on a hit and falls at the
+  decay rate, so you watch the strike ring out. Bottom segment lights first.
+- **MATERIAL** — a knob morphing the struck character from **HARD** to **SOFT**. It moves the
+  attack time and the cutoff ceiling together: hard is fast and bright, soft is slower and
+  darker.
+- **DEC** — a bipolar CV attenuverter sitting directly above the DEC input jack. It scales
+  decay modulation; at the center detent the CV has no effect. Turn counter-clockwise to
+  invert.
+- **CTRL** — a bipolar CV attenuverter above the CTRL input jack, scaling the control input
+  that opens the gate directly. CTRL is normalled to +10 V, so with the attenuverter at 0
+  there is no effect; turn it up to push the gate open from the normal, or patch a CV to
+  drive it.
+
+## Inputs &amp; outputs
+
+Per channel (A and B identical):
+
+| Jack | Dir | Notes |
+| --- | --- | --- |
+| **IN** | in | Audio in. Normalled to a DC level, so a **HIT** with nothing patched here pings the envelope out as a percussive tone. |
+| **HIT** | in | Trigger. Schmitt-triggered (hysteretic), so a noisy or slow gate can't chatter-retrigger. A rising edge fires the strike. |
+| **DEC** | in | Decay CV, scaled by the **DEC** attenuverter. Additive — no effect when unpatched. |
+| **CTRL** | in | Control CV that opens the gate, scaled by the **CTRL** attenuverter. Normalled to +10 V. |
+| **OUT** | out | The gated audio. Channel count follows IN / HIT. |
+
+<Aside type="tip">
+  Because **IN** is normalled to DC, an unpatched channel is already a percussion voice:
+  patch a clock or trigger to **HIT**, dial **MATERIAL** and **DECAY**, and each pulse pings
+  the envelope. Patch audio into **IN** and the same hit gates that signal instead.
+</Aside>
+
+## Analog drift
+
+The seeded analog-dirt layer — small per-voice tolerances plus a slow drift on the decay,
+and a pink-noise floor — is **always on**. It is part of the instrument's voice, not a
+toggle to switch on. Each voice seeds its own deterministic imperfection, so the character
+is stable across reloads but never identical voice-to-voice.
+
+When you need the sound to be reproducible — golden regressions, sample-accurate stacking,
+or bit-identical renders — right-click the module and choose **Deterministic (disable
+analog drift)**. That setting is saved with the patch.
+
+## Driving the voice from C++
+
+The panel is a thin wrapper; here is the same voice headless, no Rack SDK in sight:
+
+```cpp
+#include "dsp/SBankDSP.hpp"
+
+sbank::StrikeCore strike(48000.f);          // sample rate
+strike.setParams(/*open=*/0.f, /*decay=*/0.5f, /*material=*/0.f);
+
+float peak = 0.f;
+for (int i = 0; i < 96000; ++i) {
+    const float hit = i < 10 ? 5.f : 0.f;   // a single trigger edge
+    // processSample(audioIn, ctrl01, decayMod, hitV)
+    const float y = strike.processSample(1.f, 0.f, 0.f, hit);
+    peak = std::max(peak, y);
+}
+```
+
+<Steps>
+
+1. Construct a `StrikeCore` with your sample rate (and optionally a seed for the drift).
+
+2. Call `setParams(open, decay, material)` whenever a control changes — all three are
+   normalized 0..1, matching the panel's faders and knob.
+
+3. Per sample, call `processSample(audioIn, ctrl01, decayMod, hitV)`: the audio in (the
+   panel feeds a DC normal when IN is unpatched), the 0..1 control level, an additive decay
+   modulation, and the hit voltage. The panel runs the HIT through a Schmitt trigger first —
+   pass a clean edge.
+
+4. Feed `lastControl()` to a meter, and call `setImperfection(...)` / `reset()` exactly as
+   the [library reference](library) describes to match a Rack channel.
+
+</Steps>
+
+<CardGrid>
+  <LinkCard
+    title="Library reference"
+    href={import.meta.env.BASE_URL + 'library'}
+    description="The clean-gate blocks Strike is built from: Envelope, Gate, PitchTracker, StrikeImperfection."
+  />
+  <LinkCard
+    title="Vactrol LPG"
+    href={import.meta.env.BASE_URL + 'modules/vactrol-lpg'}
+    description="The other demo module — the Buchla-292 vactrol cell, the clean gate's analog counterpart."
+  />
+  <LinkCard
+    title="Develop"
+    href={import.meta.env.BASE_URL + 'development'}
+    description="Repo layout, build &amp; test, the golden regression, and how the panels are generated."
+  />
+</CardGrid>

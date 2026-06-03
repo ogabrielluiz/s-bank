@@ -1,0 +1,156 @@
+---
+title: Develop
+description: "Repo layout, build and test commands, the golden regression, and the generated panels for the S-Bank DSP library."
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+S-Bank is a **library** first: the reusable, header-only DSP is the product, and the two
+VCV Rack modules are demos that prove it. The repo layout reflects that split — the blocks
+live in one header, the demo plugin and its panels around it.
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `modules/rack/src/dsp/SBankDSP.hpp` | **The library.** Header-only C++, namespace `sbank`, **no Rack-SDK dependency** — `VactrolLpg`, `StrikeCore`, and the building blocks (`Cell292`, `Oversampler`, `Envelope`, `Gate`, `VactrolModel`, the seeded drift). |
+| `modules/rack/src/*.cpp` | **The demo plugin.** `Strike.cpp` and `VactrolLPG.cpp` are thin Rack adapters that own a DSP core per voice and wire jacks/knobs to it. |
+| `tools/panelgen/` | **Panel generator.** `generate.py` emits each module's SVG art and its C++ widget placement (`*_panel.inc`) from a single spec. |
+| `modules/rack/test/` | **Tests.** The golden regression (`run_golden.sh`, `golden_dump.cpp`, `golden_check.py`) and the finite/sane smoke check (`dsp_smoke.cpp`). |
+| `docs/` | This Starlight site, plus the design notes (`DESIGN.md`, `REFERENCES.md`). |
+
+<Aside type="note">
+  The header is the unit of reuse. To embed S-Bank in another audio project you copy
+  `SBankDSP.hpp`, construct a voice, and call `processSample` — none of the `*.cpp`, the
+  panel generator, or the Rack SDK comes with it.
+</Aside>
+
+## Build &amp; test
+
+The DSP needs only a C++11 compiler; the demo plugin needs the Rack SDK. Most development
+loops touch the header and never build the plugin at all.
+
+<Steps>
+
+1. **Smoke the DSP** (finite / sane, no SDK). A real headless run of both voices lives in
+   `dsp_smoke.cpp`:
+
+   ```bash
+   c++ -std=c++11 -O2 -Wall -Wextra -I modules/rack/src \
+     modules/rack/test/dsp_smoke.cpp -o /tmp/dsp_smoke && /tmp/dsp_smoke
+   ```
+
+2. **Run the golden regression** (the DSP must match its committed reference output):
+
+   ```bash
+   modules/rack/test/run_golden.sh
+   ```
+
+3. **Build the demo plugin** against the Rack SDK:
+
+   ```bash
+   make install RACK_DIR=/path/to/Rack-SDK
+   ```
+
+</Steps>
+
+A minimal headless use of the library reads the same in any project:
+
+```cpp
+#include "dsp/SBankDSP.hpp"
+
+sbank::VactrolLpg lpg(48000.f);
+lpg.setParams(/*mode*/ 0, /*resonance*/ 0.2f, /*cvOffset*/ 0.f, /*drive*/ 1.f, /*os*/ 2);
+float y = lpg.processSample(audioIn, cvIn);   // audio in ±1, cv in volts
+```
+
+## The golden regression locks the sound
+
+The DSP's job is to sound a specific way, so its output is pinned by a **golden regression**.
+`golden_dump.cpp` renders fixed scenarios — `pluck_both`, `vca_tone`, `lowpass_sweep` for the
+vactrol; `ping`, `gated`, `held` for Strike — and `golden_check.py` compares the result
+sample-for-sample against the committed buffers in `testdata/golden/`. The tolerance is
+**0.1 % of peak**, enough to absorb cross-platform `libm` differences in `sinf`/`tanhf`/`expf`
+while still catching any real change to the algorithm.
+
+<Aside type="caution">
+  A failing golden means **the sound changed**. If that was unintentional, fix the code. Only
+  when you have *deliberately* changed the sound do you re-bless:
+
+  ```bash
+  modules/rack/test/run_golden.sh --bless
+  ```
+
+  Re-blessing rewrites the reference buffers — review that diff as carefully as the code.
+</Aside>
+
+The deterministic core is what the goldens cover. The optional **analogue imperfection** layer
+(`StrikeImperfection` — seeded random tolerance and drift) is intentionally out of scope: it is
+random by design, so no single buffer is the "correct" one. It is verified finite, bounded, and
+deterministic from its seed instead.
+
+## Panels are generated, never hand-edited
+
+A module's panel and its widget positions come from one source. Each panel is declared once in
+`tools/panelgen/generate.py` (`build_strike`, `build_vactrol`), and the generator emits both the
+SVG art (`res/*.svg`, in black and silver finishes) and the C++ component placement
+(`src/*_panel.inc`) so the art and the widget positions stay in lockstep by construction.
+
+<Aside type="danger">
+  Never hand-edit a generated `.svg` or `_panel.inc`. Edit the spec, then regenerate:
+
+  ```bash
+  python3 tools/panelgen/generate.py
+  ```
+
+  CI re-runs the generator and fails if the committed files differ — manual edits will not
+  survive.
+</Aside>
+
+### Collision guardrail
+
+The generator carries a layout guardrail: a label must not land on a control or jack, on
+another label, or even come **within 1 mm** of a footprint (it flags near-misses, not just hard
+overlaps; a label is allowed to sit adjacent to *its own* control, where only a real overlap is
+reported). If anything collides, `generate.py` prints the offending `!!` lines and exits
+non-zero — so a crowded panel breaks the build rather than shipping. CI runs this.
+
+### Colour is state
+
+The Sam-e panels read colour as signal role, consistently across both demos:
+
+| Colour | Role |
+| --- | --- |
+| Yellow | Excitation (HIT / trigger / strike) |
+| Cyan | CV (control voltage in) |
+| Orange | Output / identity |
+
+## CI &amp; releases
+
+CI runs three jobs on every PR and on pushes to `main`: the **DSP** smoke + golden regression
+(no SDK), a **lint** job that fails if the panels are out of sync with their specs or any source
+is missing an SPDX header, and a real **lin-x64 plugin build** to catch build breakage before
+merge. The full multi-platform packaging lives in the release workflow, triggered by a `v*` tag.
+
+<Aside type="note">
+  This is a Rack 2 plugin, so `plugin.json`'s `version` **must** be major `2`. The release
+  workflow also refuses to publish unless that version matches the pushed tag.
+</Aside>
+
+## Design notes
+
+The "why" behind the DSP — the Buchla-292 state-space model, the vactrol power law, and the
+sources they were validated against — lives in the design notes.
+
+<CardGrid>
+  <LinkCard
+    title="DESIGN.md"
+    href="https://github.com/ogabrielluiz/s-bank/blob/main/docs/DESIGN.md"
+    description="Architecture and DSP design notes: the topology-preserving 292 model, the control/vactrol/audio paths, and why state-space over a transfer function."
+  />
+  <LinkCard
+    title="REFERENCES.md"
+    href="https://github.com/ogabrielluiz/s-bank/blob/main/docs/REFERENCES.md"
+    description="Primary sources and model validation: Parker &amp; D'Angelo (DAFx-13), the VTL5C3 datasheet, and what the model confirms, corrects, or approximates."
+  />
+</CardGrid>

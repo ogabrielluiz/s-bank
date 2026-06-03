@@ -1,0 +1,12 @@
+/* S-Bank brand accent — signal orange (#FF5A00), the only colour that is "on". */
+:root {
+  --sl-color-accent-low: #46180a;
+  --sl-color-accent: #ff5a00;
+  --sl-color-accent-high: #ffc4a8;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #ffd9c4;
+  --sl-color-accent: #e8500a;
+  --sl-color-accent-high: #5e1f00;
+}

@@ -1,0 +1,67 @@
+---
+title: Install the demo plugin
+description: "Install the S-Bank demo plugin in VCV Rack 2 to hear the analog-emulation DSP library at work."
+---
+
+import { Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+S-Bank is a **library of analog-emulation DSP building blocks**. You don't install the library;
+you embed it — see [Use the library](library). What you *install* is the **demo plugin**: two
+modules that drive the library inside **VCV Rack 2** so you can hear it before you write a line
+of code.
+
+The demo plugin isn't in the VCV Library yet, so install it by hand.
+
+## Install the pre-built plugin
+
+<Steps>
+
+1. **Download** the `.vcvplugin` for your platform from the
+   [latest release](https://github.com/ogabrielluiz/s-bank/releases/latest):
+
+   | Platform | File |
+   | --- | --- |
+   | macOS (Apple Silicon) | `SBank-2.0.0-mac-arm64.vcvplugin` |
+   | macOS (Intel) | `SBank-2.0.0-mac-x64.vcvplugin` |
+   | Windows | `SBank-2.0.0-win-x64.vcvplugin` |
+   | Linux | `SBank-2.0.0-lin-x64.vcvplugin` |
+
+2. **Open Rack's user folder.** In Rack, choose **Help → Open user folder**, then drop the
+   `.vcvplugin` into the `plugins/` subfolder.
+
+3. **Restart Rack.** Plugins load at startup.
+
+4. **Find S-Bank in the module browser.** Search `S-Bank`, or a module name — **Strike** or
+   **Vactrol LPG**.
+
+</Steps>
+
+<Aside type="note">
+  The plugin reports version `2.0.0`. In VCV Rack the major version simply marks Rack
+  compatibility — `2.x` means "for Rack 2." It does not track the library's own API.
+</Aside>
+
+## Build from source
+
+If you'd rather build it yourself, you need the
+[VCV Rack SDK](https://vcvrack.com/manual/Building) and a C++ toolchain.
+
+```bash
+git clone https://github.com/ogabrielluiz/s-bank.git
+cd s-bank/modules/rack
+make install RACK_DIR=/path/to/Rack-SDK
+```
+
+`make install` packages a `.vcvplugin` and copies it into Rack's user `plugins/` folder, ready
+for the next restart.
+
+<Aside type="tip">
+  The demo plugin is the only part that needs the Rack SDK. The DSP library underneath is
+  header-only C++ with no Rack dependency — it builds and runs headless on its own.
+</Aside>
+
+<LinkCard
+  title="Use the library"
+  href={import.meta.env.BASE_URL + 'library'}
+  description="Skip the plugin entirely: include the header, construct a voice, and process samples in any audio project."
+/>

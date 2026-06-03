@@ -1,0 +1,194 @@
+---
+title: Use the library
+description: "Drop the S-Bank header into any audio project, construct a voice, and process samples — header-only C++ with no VCV-Rack-SDK dependency."
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+S-Bank is the DSP, not the modules. Everything lives in one header,
+`modules/rack/src/dsp/SBankDSP.hpp`, under namespace `sbank`. There is **no VCV-Rack-SDK
+dependency**: the header pulls in `<algorithm>`, `<array>`, `<cmath>`, `<cstdint>`, and
+`<cstddef>` and nothing else. It compiles and runs headless, so you can embed it in a Rack
+module, a plugin, a command-line renderer, or a test harness.
+
+```cpp
+#include "dsp/SBankDSP.hpp"
+```
+
+That is the whole installation: copy the header (or vendor the `dsp/` directory) into your
+build, include it, and use the types below. The demo modules `Strike` and `VactrolLPG` are
+thin Rack adapters over exactly these classes — they exist to prove the library, not to be it.
+
+<Aside type="caution" title="The setParams API is positional today">
+  Every voice configures itself through a positional `setParams(...)` of bare `float`/`int`
+  arguments — no named struct, no units in the type system. This is a known rough edge: the
+  argument order matters and the compiler will not catch a swap. Read the lists below
+  carefully, and keep your call site close to this page until the API grows named parameters.
+</Aside>
+
+## VactrolLpg — the Buchla-292 vactrol gate
+
+`sbank::VactrolLpg` is the full vactrol low-pass gate: a control path (CV smoothing plus the
+Parker &amp; D'Angelo opto-current model), the vactrol resistance model with its slow attack and
+bloomed release, and a state-space audio cell with optional oversampling.
+
+<Steps>
+
+1. **Construct** with the sample rate (defaults to `48000.f`):
+   `sbank::VactrolLpg lpg(sampleRate);`
+
+2. **Configure** with `setParams(mode, resonance, cvOffset, drive, oversample)`.
+
+3. **Run** one sample at a time through `processSample(audioIn, cvIn)`.
+
+</Steps>
+
+`setParams(uint32_t mode, float resonance, float cvOffset, float drive, uint32_t oversample)`:
+
+| Arg | Type | Meaning | Range / units |
+|-----|------|---------|---------------|
+| `mode` | `uint32_t` | `0` = Both (LPG), `1` = VCA only, `2` = Lowpass only | 0, 1, or 2 |
+| `resonance` | `float` | Audio-cell resonance | 0.0 – 1.0 (clamped) |
+| `cvOffset` | `float` | DC added to the incoming CV before the control model | volts |
+| `drive` | `float` | `tanh` drive into the cell; `0` disables the nonlinearity | ~0.0 – 8.0 |
+| `oversample` | `uint32_t` | Requested oversampling; clamped to 4, then mapped to a 1× / 2× / 4× factor | 1, 2, or 4 |
+
+```cpp
+sbank::VactrolLpg lpg(48000.f);
+lpg.setParams(0, 0.2f, 0.f, 1.f, 2);     // Both mode, 2x oversample
+
+for (int i = 0; i < 48000; ++i) {
+    float x  = std::sin(2.f * sbank::kPi * 220.f * i / 48000.f); // audio, nominal +-1.0
+    float cv = i < 12000 ? 8.f : 0.f;                            // CV in volts: open, then close
+    float y  = lpg.processSample(x, cv);                         // one sample out
+    // y is nominal +-1.0
+}
+```
+
+`lpg.lastResistance()` exposes the current vactrol resistance (ohms) if you want to drive a
+meter or a scope. Call `lpg.reset()` to clear the cell state, the smoother, and the vactrol
+back to its dark (fully closed) resistance.
+
+## StrikeCore — the clean, zero-bleed gate
+
+`sbank::StrikeCore` is the inverse philosophy: a shaped envelope drives a clean state-variable
+gate that bleeds nothing when closed, with an always-available analog-drift layer.
+
+<Steps>
+
+1. **Construct** with the sample rate and an optional 64-bit seed for the drift RNGs:
+   `sbank::StrikeCore strike(sampleRate);`
+
+2. **Configure** the voice with `setParams(open, decay, material)`, and optionally the drift
+   with `setImperfection(enabled, noiseAmp, driftAmount)`.
+
+3. **Run** one sample through `processSample(audioIn, ctrl01, decayMod, hitV)`.
+
+</Steps>
+
+`setParams(float open, float decay, float material)`:
+
+| Arg | Type | Meaning | Range / units |
+|-----|------|---------|---------------|
+| `open` | `float` | Gate floor — minimum openness even with no hit | 0.0 – 1.0 |
+| `decay` | `float` | Envelope decay; longer ring as it rises | 0.0 – 1.0 |
+| `material` | `float` | Hard → soft: sets attack time, cutoff ceiling, and level | 0.0 – 1.0 |
+
+`processSample(float audioIn, float ctrl01, float decayMod, float hitV)`:
+
+| Arg | Type | Meaning | Range / units |
+|-----|------|---------|---------------|
+| `audioIn` | `float` | Audio to gate | nominal +-1.0 |
+| `ctrl01` | `float` | Direct openness control, summed into the envelope target | 0.0 – 1.0 |
+| `decayMod` | `float` | Additive decay modulation; `0` for none | ~0.0 – 1.0 units |
+| `hitV` | `float` | Trigger; a rising edge crossing `0.25` fires the envelope | volts (e.g. `0` / `5`+) |
+
+```cpp
+sbank::StrikeCore strike(48000.f);
+strike.setParams(0.f, 0.5f, 0.f);          // open=0, decay=0.5, material=hard
+
+for (int i = 0; i < 96000; ++i) {
+    float hit = i < 10 ? 5.f : 0.f;        // a brief trigger edge, in volts
+    float y   = strike.processSample(1.f, 0.f, 0.f, hit); // IN held at DC -> percussive ping
+    // y is nominal +-1.0
+}
+```
+
+Feeding a DC level into `audioIn` (here `1.f`) with no other source makes a `hitV` edge emit
+the raw envelope — a percussive ping — which is exactly how Strike's `IN` jack is normalled in
+the Rack adapter. `setImperfection(true, 1.0e-4f, 1.f)` turns on the seeded drift and
+pink-noise floor; `reset()` clears the envelope, gate, pitch tracker, and drift state.
+
+## Signal conventions
+
+These are the conventions the Rack adapters rely on, and they are the contract for any host:
+
+- **Audio is nominal `+-1.0`.** The Rack wrappers convert at the jack — they divide the
+  `+-5 V` Eurorack signal by 5 on the way in and multiply by 5 on the way out. Inside the
+  library, audio is unit-scaled.
+- **CV is in volts.** `VactrolLpg::processSample` takes `cvIn` directly in volts (the demo
+  feeds `8 V` to open the gate); the control model clamps it internally before smoothing.
+- **Strike's control inputs are pre-normalized.** `ctrl01` and the `decayMod` are `0..1`-scale
+  values, not raw volts — the adapter does the `/10` mapping and attenuverter math before the
+  call. Only `hitV` is a voltage: a rising edge through the `0.25` threshold fires the strike.
+
+## Real-time-safety contract
+
+The per-sample path is written to be audio-thread safe. Honoring this contract is on you:
+
+- **`processSample` does not allocate, lock, or throw.** No heap, no mutexes, no exceptions on
+  the audio path. State lives in fixed-size members and `std::array`s sized at compile time.
+- **Call `setSampleRate(...)` off the audio thread.** It recomputes smoothing and filter
+  coefficients; treat it as setup or a control-thread event (the adapters call it from
+  `onSampleRateChange`), not per block.
+- **`setParams(...)` is cheap and audio-thread safe** — the adapters call it every sample. It
+  only stores values and (for the vactrol) maps the oversample factor.
+- **`reset()` clears all internal state.** Use it on patch reset or voice steal to silence
+  ringing tails and return the vactrol to its dark resistance. It does not allocate.
+
+<Aside type="note">
+  There is no `processBlock`. You drive these voices one sample at a time, which is what makes
+  the state-space and oversampled cells exact. Wrap them in your own block loop.
+</Aside>
+
+## The building blocks
+
+`VactrolLpg` and `StrikeCore` are themselves compositions. The same header exposes the smaller
+pieces, so you can wire them into a new voice instead of reaching for the prebuilt gates:
+
+| Block | Role |
+|-------|------|
+| `ControlPath` / `ControlCoeffs` | CV smoothing &amp; the opto-current model — volts in, vactrol drive current out |
+| `VactrolModel` | The vactrol cell itself: drive current in, time-varying resistance out (slow attack, bloomed release) |
+| `AudioPath` / `Cell292` | The state-space Buchla-292 audio cell, with resonance and `tanh` drive |
+| `Oversampler` / `HalfbandStage` | 2×/4× polyphase half-band oversampling around any per-sample nonlinearity |
+| `Envelope` | Strike's dual-rate (fast + slow) envelope with pitch-aware decay |
+| `Gate` | The clean, zero-bleed state-variable low-pass gate |
+| `Material` | Maps a single `0..1` "material" into attack time, cutoff ceiling, and level |
+| `PitchTracker` | A lightweight zero-crossing pitch estimator (used to scale decay) |
+| `PinkNoise`, `XorShift`, `SplitMix64` | The RNG / noise primitives behind the seeded analog drift |
+
+Most blocks share the same shape — `setSampleRate`, `reset`, and a `process(...)` — so they
+compose cleanly. To build a new voice, pick the cell you want (the vactrol audio path, or the
+clean gate), drive it from a control source (the opto model, an envelope, or your own CV), and
+wrap the nonlinear inner step in the `Oversampler` if you need the alias rejection. Seed an
+`XorShift` or `SplitMix64` to give two instances reproducibly different analog character.
+
+<Aside type="tip">
+  The same pieces, wired two ways, give the two demo voices: <strong>VactrolLpg</strong> =
+  ControlPath → VactrolModel → AudioPath; <strong>StrikeCore</strong> = Envelope (+ PitchTracker
+  + Material) → Gate, with the drift RNGs layered on top.
+</Aside>
+
+<CardGrid>
+  <LinkCard
+    title="Strike (demo)"
+    href={import.meta.env.BASE_URL + 'modules/strike'}
+    description="See StrikeCore driven as a dual Rack module."
+  />
+  <LinkCard
+    title="Vactrol LPG (demo)"
+    href={import.meta.env.BASE_URL + 'modules/vactrol-lpg'}
+    description="See VactrolLpg driven as a single-voice Rack module."
+  />
+</CardGrid>

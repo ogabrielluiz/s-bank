@@ -1,0 +1,119 @@
+---
+title: Vactrol LPG
+description: "A demo module that exposes the S-Bank vactrol cell — the Parker & D'Angelo state-space Buchla-292 model — as a single-voice VCV Rack low-pass gate."
+---
+
+import { Aside, Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+**Vactrol LPG** is a **demo module**, not the product. It is a thin VCV Rack panel wired
+directly to one S-Bank building block: the `sbank::VactrolLpg` voice, whose core is the
+Parker &amp; D'Angelo **state-space Buchla-292 model** (a 3-capacitor continuous-time cell
+solved as a delay-free loop) driven through a datasheet vactrol power law. The module exists
+to prove the cell behaves — and to show how little code stands between a control voltage and
+the analog response. The reusable cell is the thing worth taking; the panel around it is a
+6 HP demonstration.
+
+<Aside type="note">
+  The cell has **no VCV-Rack-SDK dependency**. The module just owns a `sbank::VactrolLpg` and
+  calls `setParams` / `processSample` per sample — the same calls you would make in any
+  headless audio project. See [The library](library) to embed it yourself.
+</Aside>
+
+## What the cell models
+
+The vactrol character is not an envelope or EQ painted on after the filter — it falls out of
+the circuit model itself:
+
+- **The control path** smooths the incoming CV with a one-pole, then maps it to an LED current
+  `If` through the authors' bias stage and saturating curve fit, clamped to the physical
+  `[10.1 uA, 40 mA]` range.
+- **The vactrol** turns that current into a resistance via the datasheet power law
+  `Rf = A/If^1.4 + B`, then passes it through an **asymmetric, state-dependent one-pole**:
+  fast on the way open, slow on the way closed. This is where the opto-isolator's slow attack
+  and long, **bloomed release** come from — the CdS cell's lag is inherent to the model, not a
+  separate decay stage.
+- **The audio path** is the 3-capacitor state-space 292 cell (C1/C2/C3), solved in closed
+  form so it stays finite at any modulation rate. The `tanh` resonance nonlinearity is
+  linearised about the previous output inside the same solve.
+
+In **VCA** mode the third capacitor (C3) is switched out, so the cell becomes a pure
+amplitude response; in **Lowpass** and **Both** it stays in, giving the resonant filter
+behaviour.
+
+## Controls
+
+The panel is generated from a single spec (`tools/panelgen/generate.py`), so labels and jacks
+match the gateware exactly. It is a single-voice, 6 HP layout; the module is **polyphonic** —
+it follows the channel count on the **IN** jack and runs one independent `sbank::VactrolLpg`
+voice per channel (up to 16).
+
+| Control | Type | Range | Drives |
+| --- | --- | --- | --- |
+| **RESO** | knob | 0 – 1 (default 0.2) | Resonance — the feedback gain, clamped per sample to the exact stability limit `amax` |
+| **DRIVE** | knob | 0 – 8 (default 1) | Pre-`tanh` drive into the resonance nonlinearity inside the cell |
+| **MODE** | 3-way switch | Both / VCA / Lowpass | Filter topology — C3 in (Both/Lowpass) or switched out (VCA) |
+| **OS** | 3-way switch | 1x / 2x / 4x (default 2x) | Oversampling factor of the whole delay-free solve (polyphase halfband) |
+
+| Jack | Direction | Notes |
+| --- | --- | --- |
+| **IN** | input | Audio in; +/-5 V is scaled to +/-1 internally. Sets the polyphony channel count. |
+| **CV** | input | Control voltage to the cell. The gate opens over roughly **CV 7 – 11 V**. |
+| **OUT** | output | Processed audio, scaled back to +/-5 V. |
+
+<Aside type="caution">
+  The cell is fully dark at **CV 0 V** by design (the offset is fixed so the gate fully
+  closes), and opens over roughly **CV 7 – 11 V**. A unipolar envelope or a short trigger into
+  **CV** is the intended drive; a bipolar LFO centred on 0 will spend much of its cycle closed.
+</Aside>
+
+## The classic pluck
+
+<Aside type="tip">
+  Set **MODE** to **Both** and feed a steady tone (or self-patched oscillator) into **IN**.
+  Send a **short trigger or fast envelope** into **CV**. The vactrol's fast attack snaps the
+  gate open; its slow, state-dependent decay then blooms the tail over ~100+ ms — both
+  amplitude and brightness fall together, because one resistance `Rf` controls the whole 292
+  cell. That coupled amplitude-and-timbre decay is the LPG sound. Add a touch of **DRIVE** and
+  **RESO** for a rounder, more vocal pluck.
+</Aside>
+
+## Driving the cell yourself
+
+The module's per-sample loop is just these calls (see `modules/rack/src/VactrolLPG.cpp` and
+the headless example in `modules/rack/test/dsp_smoke.cpp`):
+
+```cpp
+#include "dsp/SBankDSP.hpp"
+
+sbank::VactrolLpg lpg(48000.f);
+// setParams(mode, resonance, cvOffset, drive, oversample)
+//   mode: 0 = Both, 1 = VCA, 2 = Lowpass    oversample: 1 / 2 / 4
+lpg.setParams(0, 0.2f, 0.f, 1.f, 2);
+
+for (int i = 0; i < n; ++i) {
+    float cv = (i < 12000) ? 8.f : 0.f;   // short "trigger": open, then bloom shut
+    float y = lpg.processSample(audioIn[i], cv);
+    // ...
+}
+```
+
+No panel, no Rack engine — `setSampleRate`, `setParams`, `processSample`, and `reset` are the
+whole surface. That is the point of the library: this demo is one small caller of it.
+
+<CardGrid>
+  <LinkCard
+    title="The library"
+    href={import.meta.env.BASE_URL + 'library'}
+    description="Embed sbank::VactrolLpg and the other building blocks in your own project. Header-only C++, no Rack-SDK dependency."
+  />
+  <LinkCard
+    title="Strike"
+    href={import.meta.env.BASE_URL + 'modules/strike'}
+    description="The other demo module — a dual, clean, zero-bleed envelope-driven gate built on the clean-gate blocks."
+  />
+  <LinkCard
+    title="Develop"
+    href={import.meta.env.BASE_URL + 'development'}
+    description="Repo layout, build &amp; test, the golden regression, and how the panels are generated."
+  />
+</CardGrid>
