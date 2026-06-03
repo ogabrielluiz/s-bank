@@ -1,4 +1,7 @@
-# S-Bank
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="logos/s-bank-wordmark-on-dark.svg">
+  <img alt="S-Bank" src="logos/s-bank-wordmark-on-light.svg" width="320">
+</picture>
 
 [![ci](https://github.com/ogabrielluiz/s-bank/actions/workflows/ci.yml/badge.svg)](https://github.com/ogabrielluiz/s-bank/actions/workflows/ci.yml)
 

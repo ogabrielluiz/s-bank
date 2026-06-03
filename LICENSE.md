@@ -27,6 +27,7 @@ The following are **not** covered by the MIT/Apache/GPL grants above and may **n
 reused, redistributed, or modified without permission:
 
 - The panel designs / trade dress: `modules/rack/res/*.svg`.
+- The logos / brand marks in `logos/`.
 - The **Sam-e** name, the **S-Bank** name, and the **S-** mark.
 - The brand living document in `site/`.
 
