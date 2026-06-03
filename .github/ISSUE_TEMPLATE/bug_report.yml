@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in an S-Bank module behaves wrong, crashes, or sounds off.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The more specific the repro, the faster it gets fixed.
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      description: Which module is affected?
+      options:
+        - Vactrol LPG
+        - Strike
+        - Not sure / general
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see/hear, and what did you expect instead?
+      placeholder: e.g. "Strike keeps a faint tone bleeding through when the gate is fully closed."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A patch that shows it is ideal. Knob/CV settings, signal sources, polyphony.
+      placeholder: |
+        1. Patch a 220 Hz sine into IN
+        2. OPEN at 0, DECAY at 12 o'clock
+        3. Trigger HIT — ...
+    validations:
+      required: true
+  - type: input
+    id: rack-version
+    attributes:
+      label: VCV Rack version
+      placeholder: e.g. 2.5.2
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple Silicon / arm64)
+        - macOS (Intel / x64)
+        - Windows (x64)
+        - Linux (x64)
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: S-Bank version
+      description: Right-click the module → the plugin version, or the .vcvplugin filename.
+      placeholder: e.g. 2.0.0
+  - type: textarea
+    id: logs
+    attributes:
+      label: Rack log (optional)
+      description: Relevant lines from Rack's log.txt (Help → Open user folder → log.txt). Will be rendered as code.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true

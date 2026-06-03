@@ -1,0 +1,39 @@
+name: Feature request / idea
+description: Suggest a module, a control, a sound, or an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas welcome — modules, controls, behaviours, panel/UX, or DSP character.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Existing module (Vactrol LPG / Strike)
+        - New module / instrument
+        - DSP / sound / analog character
+        - Panel / UI / ergonomics
+        - Library API (the reusable DSP)
+        - Docs / examples
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What's the problem or the thing you want? Why is it useful?
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How might it work?
+      description: Controls, ranges, CV, modes, expected behaviour — as concrete as you can.
+  - type: textarea
+    id: references
+    attributes:
+      label: References (optional)
+      description: Hardware, modules, recordings, or papers that capture the feel you're after.

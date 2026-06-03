@@ -1,5 +1,19 @@
 name: ci
-on: [push, pull_request]
+
+# Fast checks on every PR and on pushes to main:
+#   dsp   — header-only DSP smoke + golden regression (no Rack SDK)
+#   lint  — panels are in sync with their specs + every source has an SPDX header
+#   build — a real lin-x64 plugin compile to catch build breakage before merge
+# The full multi-platform packaging lives in release.yml (runs on v* tags).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   dsp:
@@ -7,14 +21,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # The shipping DSP is header-only C++ (modules/rack/src/dsp/SBankDSP.hpp),
-      # so these tests need only a C++ compiler + python3 — no Rack SDK.
       - name: Smoke (finite / sane)
         run: |
           c++ -std=c++11 -O2 -Wall -Wextra -I modules/rack/src \
             modules/rack/test/dsp_smoke.cpp -o /tmp/dsp_smoke
           /tmp/dsp_smoke
-
       - name: Golden regression (DSP matches committed goldens)
         run: modules/rack/test/run_golden.sh
+
+  lint:
+    name: Panels in sync + SPDX headers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Panels match their specs (no manual drift)
+        run: |
+          python3 tools/panelgen/generate.py
+          if ! git diff --quiet -- modules/rack/res modules/rack/src/*_panel.inc; then
+            echo "::error::Panels are out of date. Run: python3 tools/panelgen/generate.py and commit the result."
+            git --no-pager diff --stat -- modules/rack/res modules/rack/src/*_panel.inc
+            exit 1
+          fi
+      - name: Every source carries an SPDX header
+        run: |
+          missing=0
+          while IFS= read -r f; do
+            if ! head -n 3 "$f" | grep -q "SPDX-License-Identifier"; then
+              echo "::error file=$f::missing SPDX-License-Identifier header"
+              missing=1
+            fi
+          done < <(find modules/rack/src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.inc' \))
+          exit $missing
+
+  build:
+    name: Build (lin-x64)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/qno/rack-plugin-toolchain-win-linux
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build plugin (lin-x64)
+        run: |
+          export PLUGIN_DIR="$GITHUB_WORKSPACE/modules/rack"
+          pushd /home/build/rack-plugin-toolchain
+          make plugin-build-lin-x64
+      - name: Upload lin-x64 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SBank-lin-x64
+          path: /home/build/rack-plugin-toolchain/plugin-build/*.vcvplugin
+          if-no-files-found: error
