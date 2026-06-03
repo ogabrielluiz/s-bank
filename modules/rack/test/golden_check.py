@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Compare the C++ port's output to the Rust golden buffers (sample-for-sample).
+"""Compare the DSP output to the committed golden buffers (sample-for-sample).
 
-Usage: parity_check.py <parity_binary>
-Passes if every case's max abs diff is < 0.1% of the case peak — i.e. the C++ DSP is
-numerically faithful to the Rust reference (residual = std-lib transcendental ULP).
+Usage: golden_check.py <golden_dump_binary>
+Passes if every case's max abs diff is < 0.1% of the case peak (the small tolerance
+absorbs cross-platform libm differences in sinf/tanhf/expf).
 """
 import json
-import math
 import subprocess
 import sys
 from pathlib import Path
@@ -42,7 +41,7 @@ def main() -> int:
         passed = rel < TOL
         ok = ok and passed
         print(f"{'PASS' if passed else 'FAIL'} {case:22} peak {peak:.4f}  maxdiff {maxd:.2e} ({rel*100:.4f}% of peak)")
-    print("C++<->Rust DSP parity:", "PASS" if ok else "FAIL")
+    print("Golden regression:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 

@@ -43,7 +43,8 @@ notes). Summary of what was confirmed, corrected, and what remains approximate.
   k2=4.1667e-4, k3=7.3915e-9) in the central branch, the saturating branches, and
   the piecewise `If` clamp to `[10.1 uA, 40 mA]`. All resistor/op-amp constants
   (R3, R5, R6, R7, R8, R9, alpha, beta, G, n, VT, Vs, ...) match the source. The
-  Rust port is checked against the reference values in a unit test (`control_path`).
+  control path is locked against these reference values by the golden regression
+  (`modules/rack/test/`).
 
 ## Where the model diverges (documented approximations, not bugs)
 

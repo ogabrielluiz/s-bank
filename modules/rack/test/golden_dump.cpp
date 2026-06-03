@@ -1,8 +1,6 @@
-// C++<->Rust DSP parity harness.
-//
-// Reproduces the Rust golden scenarios with the C++ port and prints the buffer, so the
-// C++ DSP can be checked sample-for-sample against the Rust reference (the components/
-// crates). Run via test/run_parity.sh.
+// Golden regression harness: dumps the DSP output for fixed scenarios so it can be
+// checked sample-for-sample against the committed goldens (testdata/golden/). Run via
+// test/run_golden.sh.
 //
 // Cases (argv[1]):
 //   lpg:pluck_both | lpg:vca_tone | lpg:lowpass_sweep   (vs testdata/golden/<name>.json)

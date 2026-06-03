@@ -1,0 +1,20 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  dsp:
+    name: DSP smoke + golden regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The shipping DSP is header-only C++ (modules/rack/src/dsp/SBankDSP.hpp),
+      # so these tests need only a C++ compiler + python3 — no Rack SDK.
+      - name: Smoke (finite / sane)
+        run: |
+          c++ -std=c++11 -O2 -Wall -Wextra -I modules/rack/src \
+            modules/rack/test/dsp_smoke.cpp -o /tmp/dsp_smoke
+          /tmp/dsp_smoke
+
+      - name: Golden regression (DSP matches committed goldens)
+        run: modules/rack/test/run_golden.sh

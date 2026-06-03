@@ -1,37 +1,38 @@
-# C++ DSP tests & parity
+# C++ DSP tests
 
-The shipping plugin's DSP is **native C++** (`../src/dsp/SBankDSP.hpp`). The Rust
-crates in `components/` are kept as the **reference implementation and golden source**;
-these tests prove the C++ port matches them.
+The shipping plugin's DSP is **native C++** (`../src/dsp/SBankDSP.hpp`). These tests
+lock its sound in place: a **golden regression** that fails if the output drifts from
+the committed reference buffers, plus a finite/sane smoke check.
 
 ## Run
 
 ```sh
-./run_parity.sh          # compile parity.cpp, check C++ output vs the Rust goldens
-./run_parity.sh --bless  # regenerate the Strike goldens from the Rust reference
+./run_golden.sh          # compile golden_dump.cpp, check DSP output vs the committed goldens
+./run_golden.sh --bless  # regenerate the goldens from the current DSP (only after an
+                         # intentional sound change)
 c++ -std=c++11 -I ../src dsp_smoke.cpp -o /tmp/smoke && /tmp/smoke   # finite/sane smoke
 ```
 
-## What parity checks
+## What the golden regression checks
 
-`parity.cpp` reproduces the Rust golden scenarios with the C++ port; `parity_check.py`
-compares sample-for-sample against `testdata/golden/`:
+`golden_dump.cpp` renders fixed scenarios with the DSP; `golden_check.py` compares the
+output sample-for-sample against `testdata/golden/`:
 
-- **Vactrol**: `pluck_both`, `vca_tone`, `lowpass_sweep` (from `cargo run -p vactrol-harness -- bless`).
-- **Strike**: `ping`, `gated`, `held` (from the `strike-core` `parity_dump` example).
+- **Vactrol**: `pluck_both`, `vca_tone`, `lowpass_sweep`
+- **Strike**: `ping`, `gated`, `held`
 
-The deterministic signal paths match the Rust reference to **< 0.002 % of peak** (the
-residual is just `sinf`/`tanhf`/`expf` ULP differences between the two std libs).
+The goldens were captured from the DSP itself (`./run_golden.sh --bless`). The check
+tolerance is **0.1 % of peak**, which absorbs cross-platform libm differences in
+`sinf`/`tanhf`/`expf` while still catching any real change to the algorithm.
 
-## Known intentional divergence: the imperfection layer
+## Out of scope: the imperfection layer
 
-Parity covers the deterministic DSP (the default sound). The optional **analogue
-imperfection** layer is deliberately *not* bit-identical to Rust:
+The golden regression covers the deterministic DSP — the default sound. The optional
+**analogue imperfection** layer (per-instance random tolerance / drift) is *not* golden-
+tested, by design:
 
-- **Vactrol**: the C++ `VactrolLpg` omits the imperfection layer entirely — the vactrol
-  module never exposed an imperfection control, so there is zero user-facing effect.
-- **Strike**: the C++ `StrikeImperfection` uses SplitMix64/xorshift where the Rust core
-  used ChaCha8 for the per-instance tolerance. It is finite, bounded, and deterministic
-  from its seed (verified), so it is a valid analogue-dirt feature — it just produces a
-  *different* random fingerprint than Rust. For random dirt with no golden, bit-parity
-  is neither required nor meaningful.
+- **Vactrol**: `VactrolLpg` omits the imperfection layer entirely — the module never
+  exposed an imperfection control, so there is no user-facing effect.
+- **Strike**: `StrikeImperfection` is seeded random dirt — finite, bounded, and
+  deterministic from its seed (verified). Because it is intentionally random and has no
+  single "correct" buffer, a sample-for-sample golden is neither meaningful nor required.

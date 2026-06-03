@@ -1,7 +1,7 @@
 // Native VCV Rack adapter for the S-Bank vactrol low-pass gate.
 //
-// The publishable Rack path is pure C++: one DSP core per polyphony channel, no
-// Rust staticlib or C ABI in the plugin build.
+// Pure C++: one DSP core (sbank::VactrolLpg, from dsp/SBankDSP.hpp) per polyphony
+// channel, owned directly by the module.
 
 #include "plugin.hpp"
 #include "dsp/SBankDSP.hpp"

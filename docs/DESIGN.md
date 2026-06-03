@@ -1,9 +1,9 @@
 # Vactrol LPG vertical slice: design notes
 
-This crate is the portable DSP core of a virtual-analog Buchla-292-style vactrol
-low-pass gate. It deliberately has **no VCV Rack SDK dependency** so the entire
-test and benchmark pipeline runs headless. A future thin C++ adapter
-(`vcv-adapter/`) links the staticlib over the C ABI in `src/ffi.rs`.
+These are design notes for the virtual-analog Buchla-292-style vactrol low-pass
+gate. The DSP is header-only C++ (`modules/rack/src/dsp/SBankDSP.hpp`,
+`sbank::VactrolLpg`) with **no VCV Rack SDK dependency**, so it tests and runs
+headless; the Rack module owns the core directly.
 
 ## Architecture (per sample)
 
@@ -42,30 +42,21 @@ this; the DC-divider identity was verified numerically against `R3/(R3+2·Rf)`.
 
 ## Status
 
-- **Phase 0**: workspace scaffolding. Done.
-- **Phase 1**: DSP core + vactrol model + tests. Done.
-- **Phase 2**: polyphase halfband oversampling (1x/2x/4x) of the full delay-free
-  solve + spectral/aliasing tests. Done. (An earlier memoryless output-buffer ADAA
-  stage was removed once the audio path became the in-loop state-space solve; see
-  the antialiasing notes.)
-- **Phase 3**: imperfection layer (per-instance tolerance, drift, thermal, noise
-  floor), seedable and serializable. Done.
-- **Phase 4**: golden-file management (`reference` module, `bless`, tolerance
-  comparison) + smoke/correctness/spectral tests. Done.
-- **Phase 5**: benchmark suite (per-config, voices, worst-case vs typical). Done.
-- **SIMD voice block** (`simd.rs`, `LpgX4`): four voices on `wide::f32x4`, a
-  line-for-line mirror of the scalar DSP (verified to match within 1e-3 in
-  `tests/simd.rs`). 16 voices cost ~0.73 ms vs ~2.4 ms scalar in the bench, a
-  ~3.3x throughput gain. Imperfection is applied per lane: each of the four voices
-  carries its own `Imperfection` instance (seed derived from one base seed), so the
-  polyphony voices are each a slightly different physical channel. Lane `i` mirrors
-  a scalar `Lpg` with the same derived seed (`tests/simd.rs`); when imperfection is
-  disabled the block runs the original shared/splat fast path.
-- **Phase 6**: tiered CI live in `.github/workflows/` (smoke/pr/nightly/release);
-  rationale in `docs/CI.md`. Done.
-- **Phase 7**: VCV adapter builds and links against the Rack v2 SDK on
-  macOS/arm64 (`vcv-adapter/`, produces `plugin.dylib` over the C ABI). Done; a
-  scripted in-Rack runtime test and other platforms remain open.
+The DSP is header-only C++ in `modules/rack/src/dsp/SBankDSP.hpp` (`sbank::`
+classes), owned directly by the Rack modules. What it implements:
+
+- **DSP core + vactrol model**: the Parker & D'Angelo state-space cell + control
+  path described above.
+- **Oversampling**: polyphase halfband (1x/2x/4x) of the full delay-free solve.
+  (An earlier memoryless output-buffer ADAA stage was removed once the audio path
+  became the in-loop state-space solve; see the antialiasing notes.)
+- **Imperfection layer**: optional per-instance tolerance / drift, seedable. The
+  vactrol module does not expose it; Strike uses it for seeded analogue dirt.
+- **Tests** (`modules/rack/test/`, no Rack SDK needed): a golden regression that
+  locks the deterministic sound sample-for-sample, plus a finite/sane smoke test.
+  CI runs both on every push (`.github/workflows/ci.yml`).
+- **Plugin**: builds and links against the Rack v2 SDK and loads in VCV Rack 2 on
+  macOS/arm64. Other platforms run through the same pure-C++ build.
 
 ## Antialiasing notes
 
