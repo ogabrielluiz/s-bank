@@ -1,11 +1,18 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import remarkGfm from 'remark-gfm';
 
 // Project page at https://ogabrielluiz.github.io/s-bank
 export default defineConfig({
   site: 'https://ogabrielluiz.github.io',
   base: '/s-bank',
+  // GFM tables/strikethrough don't reach the MDX pipeline by default in this
+  // Astro 6 + @astrojs/mdx combo, so wire remark-gfm in explicitly. @astrojs/mdx
+  // inherits markdown.remarkPlugins (extendMarkdownConfig defaults to true).
+  markdown: {
+    remarkPlugins: [remarkGfm],
+  },
   integrations: [
     starlight({
       title: 'S-Bank',
