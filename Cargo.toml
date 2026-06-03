@@ -1,14 +1,13 @@
-# S-Bank — the signal bank: a virtual-analog DSP component library for VCV Rack
-# (part of the Sam-e / S- signal system). Each instrument is a portable Rust core
-# with no VCV Rack SDK dependency, so the whole test/bench pipeline runs headless;
-# a thin C++ adapter in `vcv-adapter/` links the staticlib over a C ABI. The first
-# instrument in the bank is the vactrol low-pass gate (`vactrol-core`).
+# S-Bank Rust reference workspace.
+#
+# The publishable VCV Rack plugin now lives as native C++ under `modules/rack`.
+# These Rust crates remain useful as headless reference implementations, tests,
+# benchmarks, and golden-file generators while the C++ port is verified.
 [workspace]
 resolver = "2"
 members = [
     "components/vactrol-core",
     "components/strike-core",
-    "modules/plugin",
     "tools/harness",
 ]
 

@@ -1,18 +1,15 @@
 // S-Bank "Strike" — a clean, zero-bleed, envelope-driven low-pass gate.
 //
-// A dual, mono-per-channel demo module that drives the strike-core DSP (via the
-// s-bank plugin C ABI). Each channel: OPEN / DECAY / MATERIAL knobs, DECAY-CV and
-// CTRL attenuverters, IN / HIT / DECAY / CTRL inputs, OUT, and an openness LED.
+// A dual, mono-per-channel module that drives the native C++ Strike DSP. Each
+// channel: OPEN / DECAY / MATERIAL knobs, DECAY-CV and CTRL attenuverters, IN /
+// HIT / DECAY / CTRL inputs, OUT, and an openness LED.
 // A global IMPERFECTION switch engages the optional analogue-dirt layer.
 //
 // CTRL is normalled to +10 V (attenuverter at 0 ⇒ no effect). IN is normalled to a
 // DC level, so a HIT with nothing patched into IN emits the raw envelope (ping).
 
 #include "plugin.hpp"
-
-extern "C" {
-#include "../s_bank.h"
-}
+#include "dsp/SBankDSP.hpp"
 
 struct Strike : SBankModule {
     enum ParamId {
@@ -29,7 +26,7 @@ struct Strike : SBankModule {
     enum OutputId { A_OUT_OUTPUT, B_OUT_OUTPUT, OUTPUTS_LEN };
     enum LightId { A_OPEN_LIGHT, B_OPEN_LIGHT, LIGHTS_LEN };
 
-    StrikeVoice* voice[2] = {nullptr, nullptr};
+    sbank::StrikeCore voice[2];
     bool lastImperfection = false;
 
     Strike() {
@@ -51,29 +48,24 @@ struct Strike : SBankModule {
         configSwitch(IMPERFECTION_PARAM, 0.f, 1.f, 0.f, "Analog imperfection", {"Off", "On"});
 
         float sr = APP->engine->getSampleRate();
-        voice[0] = strike_create(sr);
-        voice[1] = strike_create(sr);
-    }
-
-    ~Strike() override {
-        strike_destroy(voice[0]);
-        strike_destroy(voice[1]);
+        voice[0].setSampleRate(sr);
+        voice[1].setSampleRate(sr);
     }
 
     void onSampleRateChange(const SampleRateChangeEvent& e) override {
-        strike_set_sample_rate(voice[0], e.sampleRate);
-        strike_set_sample_rate(voice[1], e.sampleRate);
+        voice[0].setSampleRate(e.sampleRate);
+        voice[1].setSampleRate(e.sampleRate);
     }
 
     void processChannel(int ch, const ProcessArgs& args) {
-        StrikeVoice* v = voice[ch];
+        sbank::StrikeCore& v = voice[ch];
         int po = ch * 5;
         int io = ch * 4;
 
         float open = params[A_OPEN_PARAM + po].getValue();
         float decay = params[A_DECAY_PARAM + po].getValue();
         float material = params[A_MATERIAL_PARAM + po].getValue();
-        strike_set_params(v, open, decay, material);
+        v.setParams(open, decay, material);
 
         // CTRL: normalled to +10 V, scaled by its attenuverter, mapped to 0..1.
         float ctrlV = inputs[A_CTRL_INPUT + io].isConnected()
@@ -94,16 +86,16 @@ struct Strike : SBankModule {
                           : 1.0f;
         float hit = inputs[A_HIT_INPUT + io].getVoltage();
 
-        float y = strike_process_sample(v, audio, ctrl01, decayMod, hit);
+        float y = v.processSample(audio, ctrl01, decayMod, hit);
         outputs[A_OUT_OUTPUT + ch].setVoltage(y * 5.f);
-        lights[A_OPEN_LIGHT + ch].setBrightnessSmooth(strike_last_control(v), args.sampleTime);
+        lights[A_OPEN_LIGHT + ch].setBrightnessSmooth(v.lastControl(), args.sampleTime);
     }
 
     void process(const ProcessArgs& args) override {
         bool imp = params[IMPERFECTION_PARAM].getValue() > 0.5f;
         if (imp != lastImperfection) {
-            strike_set_imperfection(voice[0], imp ? 1 : 0, 1.0e-4f, 1.f);
-            strike_set_imperfection(voice[1], imp ? 1 : 0, 1.0e-4f, 1.f);
+            voice[0].setImperfection(imp, 1.0e-4f, 1.f);
+            voice[1].setImperfection(imp, 1.0e-4f, 1.f);
             lastImperfection = imp;
         }
         processChannel(0, args);

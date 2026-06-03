@@ -1,19 +1,12 @@
-// Thin VCV Rack adapter over the Rust vactrol-core C ABI.
+// Native VCV Rack adapter for the S-Bank vactrol low-pass gate.
 //
-// The DSP lives entirely in the Rust staticlib; this module owns one opaque core
-// instance per polyphony channel and forwards process() per sample. The FFI is
-// panic-safe and allocation-free on the audio thread (see ../vactrol_core.h and
-// crates/vactrol-core/src/ffi.rs).
-//
-// Note: the Rust core is currently scalar (one voice per call). When it grows a
-// lane-parametric SIMD path, map a `float_4` of four channels onto one core call
-// here instead of the per-channel loop below.
+// The publishable Rack path is pure C++: one DSP core per polyphony channel, no
+// Rust staticlib or C ABI in the plugin build.
 
 #include "plugin.hpp"
+#include "dsp/SBankDSP.hpp"
 
-extern "C" {
-#include "../s_bank.h"
-}
+#include <cmath>
 
 static const int MAX_CHANNELS = 16;
 
@@ -36,7 +29,7 @@ struct VactrolLPG : SBankModule {
     };
     enum LightId { LIGHTS_LEN };
 
-    Lpg* voices[MAX_CHANNELS] = {};
+    sbank::VactrolLpg voices[MAX_CHANNELS];
 
     VactrolLPG() {
         config(PARAMS_LEN, PARAMS_INPUT_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -50,19 +43,13 @@ struct VactrolLPG : SBankModule {
 
         float sr = APP->engine->getSampleRate();
         for (int c = 0; c < MAX_CHANNELS; c++) {
-            voices[c] = vactrol_lpg_create(sr);
-        }
-    }
-
-    ~VactrolLPG() override {
-        for (int c = 0; c < MAX_CHANNELS; c++) {
-            vactrol_lpg_destroy(voices[c]);
+            voices[c].setSampleRate(sr);
         }
     }
 
     void onSampleRateChange(const SampleRateChangeEvent& e) override {
         for (int c = 0; c < MAX_CHANNELS; c++) {
-            vactrol_lpg_set_sample_rate(voices[c], e.sampleRate);
+            voices[c].setSampleRate(e.sampleRate);
         }
     }
 
@@ -78,10 +65,10 @@ struct VactrolLPG : SBankModule {
         uint32_t oversample = (osIndex == 0) ? 1 : (osIndex == 1) ? 2 : 4;
 
         for (int c = 0; c < channels; c++) {
-            vactrol_lpg_set_params(voices[c], mode, resonance, 0.f, drive, oversample);
+            voices[c].setParams(mode, resonance, 0.f, drive, oversample);
             float audio = inputs[AUDIO_INPUT].getPolyVoltage(c) / 5.f; // +-5V -> +-1
             float cv = inputs[CV_INPUT].getPolyVoltage(c);
-            float y = vactrol_lpg_process_sample(voices[c], audio, cv);
+            float y = voices[c].processSample(audio, cv);
             outputs[AUDIO_OUTPUT].setVoltage(y * 5.f, c);
         }
     }
