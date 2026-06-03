@@ -1,13 +1,34 @@
 # S-Bank
 
+[![ci](https://github.com/ogabrielluiz/s-bank/actions/workflows/ci.yml/badge.svg)](https://github.com/ogabrielluiz/s-bank/actions/workflows/ci.yml)
+
 **The signal bank** — a library of analog-emulation DSP building blocks that help you
 build VCV Rack modules with convincing analog behaviour and sound. Part of the
 **Sam-e** signal system (`S-` is the signal). The library is the product; the modules
 here are demos that use it to prove it works and show how.
 
-The DSP is native C++ (header-only, so it tests without the Rack SDK). Two instruments
-live in the bank today: a **vactrol low-pass gate** (Buchla 292 style — dirty,
-resonant) and **Strike**, a clean, zero-bleed, envelope-driven low-pass gate.
+The DSP is native, header-only C++, so it tests without the Rack SDK.
+
+## Modules
+
+- **Vactrol LPG** — a Buchla-292-style vactrol low-pass gate: dirty, resonant, with the
+  lag and bloom of a real opto-isolator. Switches between low-pass, VCA, and combined
+  responses.
+- **Strike** — a clean, zero-bleed, envelope-driven low-pass gate. Sharp percussive
+  pings with no tone leaking through a closed gate, plus a continuous material morph.
+
+## Install
+
+> Not yet in the VCV Library. For now:
+
+- **Pre-built:** download the `.vcvplugin` for your platform from the
+  [Releases](https://github.com/ogabrielluiz/s-bank/releases) page and drop it into
+  Rack's user `plugins/` folder (Rack → *Help → Open user folder*).
+- **From source:** you need the [VCV Rack SDK](https://vcvrack.com/manual/Building).
+
+  ```sh
+  cd modules/rack && make install RACK_DIR=/path/to/Rack-SDK
+  ```
 
 ## Repo layout — the library vs. the demos
 
@@ -19,17 +40,20 @@ resonant) and **Strike**, a clean, zero-bleed, envelope-driven low-pass gate.
 - **`site/`** — the Sam-e / S- brand living document.
 - **`docs/`** — design notes ([`DESIGN.md`](docs/DESIGN.md)).
 
-## Quick start
+## Develop
+
+The DSP is header-only, so the tests need no Rack SDK:
 
 ```sh
-# VCV Rack plugin (needs the Rack SDK):
-cd modules/rack && make install RACK_DIR=/path/to/Rack-SDK
-
-# DSP tests (no Rack SDK needed):
-modules/rack/test/run_golden.sh                # golden regression
+modules/rack/test/run_golden.sh                # golden regression (locks the sound)
 c++ -std=c++11 -Wall -Wextra -pedantic -I modules/rack/src \
   modules/rack/test/dsp_smoke.cpp -o /tmp/sbank_dsp_smoke && /tmp/sbank_dsp_smoke
 ```
+
+Panels are generated — edit the spec in `tools/panelgen`, never the SVG/`.inc` by hand,
+then `python3 tools/panelgen/generate.py`. The
+[PR template](.github/PULL_REQUEST_TEMPLATE.md) lists what CI enforces (golden
+regression, panel sync, SPDX headers).
 
 ## License
 
