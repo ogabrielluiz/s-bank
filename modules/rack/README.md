@@ -37,5 +37,7 @@ c++ -std=c++11 -Wall -Wextra -pedantic -I src test/dsp_smoke.cpp \
 
 - The DSP sound is locked by the golden regression in `test/` — run it after any
   change to `src/dsp/SBankDSP.hpp` and re-bless only on intentional sound changes.
-- Licensing: shipping inside Cardinal or as a non-exception VCV plugin makes the
-  whole plugin GPLv3; choose deliberately before release.
+- Licensing: this plugin is **GPL-3.0-or-later** (`plugin.json`), built from the
+  permissive `src/dsp/` core (`MIT OR Apache-2.0`) plus GPL module glue. The panel
+  art in `res/` is brand-reserved, not under the code license. See the top-level
+  [`LICENSE.md`](../../LICENSE.md).

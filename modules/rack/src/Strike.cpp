@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // S-Bank "Strike" — a clean, zero-bleed, envelope-driven low-pass gate.
 //
 // A dual, mono-per-channel module that drives the native C++ Strike DSP. Each

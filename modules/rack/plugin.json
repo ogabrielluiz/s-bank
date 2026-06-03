@@ -2,7 +2,7 @@
   "slug": "SBank",
   "name": "S-Bank",
   "version": "2.0.0",
-  "license": "MIT OR Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "brand": "S-Bank",
   "author": "Sam-e",
   "description": "Demo VCV Rack modules built on the S-Bank analog-emulation DSP library.",

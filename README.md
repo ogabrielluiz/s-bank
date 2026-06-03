@@ -30,3 +30,17 @@ modules/rack/test/run_golden.sh                # golden regression
 c++ -std=c++11 -Wall -Wextra -pedantic -I modules/rack/src \
   modules/rack/test/dsp_smoke.cpp -o /tmp/sbank_dsp_smoke && /tmp/sbank_dsp_smoke
 ```
+
+## License
+
+S-Bank is open source with a per-area split — see [`LICENSE.md`](LICENSE.md) for the
+authoritative breakdown:
+
+- **Reusable DSP** (`modules/rack/src/dsp/`) — **MIT OR Apache-2.0**. Embed it in your
+  own modules, open or commercial.
+- **The demo plugin** and everything else — **GPL-3.0-or-later**.
+- **Brand assets** — the panel designs (`res/*.svg`), the **Sam-e** / **S-Bank** names,
+  the **S-** mark, and `site/` are © Gabriel Almeida, all rights reserved, and are **not**
+  covered by the code licenses. Please don't reuse the names or the panel look on
+  derivative works.
+- Bundled fonts (Fira Code, Space Grotesk) are under the SIL Open Font License 1.1.

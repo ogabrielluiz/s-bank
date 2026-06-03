@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Native VCV Rack adapter for the S-Bank vactrol low-pass gate.
 //
 // Pure C++: one DSP core (sbank::VactrolLpg, from dsp/SBankDSP.hpp) per polyphony
