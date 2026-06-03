@@ -16,7 +16,7 @@ the analog response. The reusable cell is the thing worth taking; the panel arou
 <Aside type="note">
   The cell has **no VCV-Rack-SDK dependency**. The module just owns a `sbank::VactrolLpg` and
   calls `setParams` / `processSample` per sample — the same calls you would make in any
-  headless audio project. See [The library](library) to embed it yourself.
+  headless audio project. See [The library](../../library/) to embed it yourself.
 </Aside>
 
 ## What the cell models
@@ -105,17 +105,17 @@ whole surface. That is the point of the library: this demo is one small caller o
 <CardGrid>
   <LinkCard
     title="The library"
-    href={import.meta.env.BASE_URL + 'library'}
+    href={import.meta.env.BASE_URL + '/library/'}
     description="Embed sbank::VactrolLpg and the other building blocks in your own project. Header-only C++, no Rack-SDK dependency."
   />
   <LinkCard
     title="Strike"
-    href={import.meta.env.BASE_URL + 'modules/strike'}
+    href={import.meta.env.BASE_URL + '/modules/strike/'}
     description="The other demo module — a dual, clean, zero-bleed envelope-driven gate built on the clean-gate blocks."
   />
   <LinkCard
     title="Develop"
-    href={import.meta.env.BASE_URL + 'development'}
+    href={import.meta.env.BASE_URL + '/development/'}
     description="Repo layout, build &amp; test, the golden regression, and how the panels are generated."
   />
 </CardGrid>
