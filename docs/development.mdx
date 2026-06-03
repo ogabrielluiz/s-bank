@@ -1,0 +1,70 @@
+---
+title: Develop
+description: "Build the plugin, run the tests, and work on the panels."
+---
+
+S-Bank is a **library plus demo modules**. The reusable DSP lives in one header; the Rack
+modules and panels are built on top of it.
+
+## Layout
+
+| Path | What |
+| --- | --- |
+| `modules/rack/src/dsp/SBankDSP.hpp` | The reusable DSP (`sbank::` classes). Header-only, **no Rack-SDK dependency**. |
+| `modules/rack/src/*.cpp` | The VCV plugin: module sources, owns the DSP cores directly. |
+| `tools/panelgen/` | The Sam-e panel generator (declarative spec → SVG art **and** C++ widget coordinates). |
+| `modules/rack/test/` | Standalone DSP tests (no Rack SDK needed). |
+
+## Build & test
+
+```bash
+# Plugin (needs the Rack SDK):
+cd modules/rack && make install RACK_DIR=/path/to/Rack-SDK
+
+# DSP tests (no SDK):
+modules/rack/test/run_golden.sh                       # golden regression
+c++ -std=c++11 -I modules/rack/src \
+  modules/rack/test/dsp_smoke.cpp -o /tmp/s && /tmp/s  # finite/sane smoke
+```
+
+The **golden regression** captures the DSP output for fixed scenarios and fails if the
+sound drifts. Run it after any change to `SBankDSP.hpp`; re-bless (`run_golden.sh --bless`)
+only on an *intentional* sound change.
+
+## Panels are generated
+
+Every panel is declared once in `tools/panelgen/generate.py`. Running it emits both the
+`res/<Module>.svg` art and the `src/<Module>_panel.inc` C++ widget coordinates, so the two
+can never drift apart.
+
+```bash
+python3 tools/panelgen/generate.py
+```
+
+<Warning>
+  Never hand-edit the SVG or `.inc` files — edit the spec and regenerate. The generator
+  also runs a **collision guardrail**: it fails if any label overlaps (or comes within
+  1&nbsp;mm of) a control, jack, or another label. CI runs it, so a crowded panel can't be
+  committed.
+</Warning>
+
+Rack's nanosvg renders only vector paths (no `<text>`), so labels are filled outlines of
+the brand fonts. Colour is state: **yellow** = excitation/trigger, **cyan** = CV/modulation,
+**orange** = output/identity.
+
+## Under the hood
+
+<CardGroup cols={2}>
+  <Card title="DSP design notes" icon="microchip" href="https://github.com/ogabrielluiz/s-bank/blob/main/docs/DESIGN.md">
+    The vactrol state-space cell, oversampling, and the imperfection layer.
+  </Card>
+  <Card title="References" icon="book" href="https://github.com/ogabrielluiz/s-bank/blob/main/docs/REFERENCES.md">
+    The Buchla-292 / Parker & D'Angelo sources the model is checked against.
+  </Card>
+</CardGroup>
+
+## CI & releases
+
+CI runs the smoke test, golden regression, panel guardrail, and a real Linux build on every
+PR. Tagging `vX.Y.Z` builds all four platforms and publishes a GitHub Release. The plugin
+major version must be `2` (Rack 2 compatibility).

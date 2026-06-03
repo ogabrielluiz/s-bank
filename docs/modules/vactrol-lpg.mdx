@@ -1,0 +1,45 @@
+---
+title: Vactrol LPG
+description: "A Buchla-292-style vactrol low-pass gate — dirty, resonant, alive."
+---
+
+**Vactrol LPG** is a virtual-analog **Buchla-292-style** low-pass gate. It models the
+opto-isolator (vactrol) at the heart of the 292: feed it a control voltage and you get the
+characteristic **slow attack and long, bloomed release** — the lag and ring are inherent to
+the circuit model, not an added envelope. Polyphonic.
+
+## What's modelled
+
+The audio path is the Parker & D'Angelo **state-space cell** of the real 292, and the
+control path is the authors' exact CV → LED-current circuit (bias stage, Lambert-W
+approximation, saturating branches). The resonance, drive, and the vactrol's asymmetric
+attack/release all come out of that model.
+
+## Controls
+
+- **RESO** _(knob)_ — resonance / emphasis at the gate's corner. Pushes the 292 toward its
+  resonant, vocal edge.
+- **DRIVE** _(knob)_ — input drive into the nonlinear cell — from clean to saturated.
+- **MODE** _(switch)_ — the response:
+  - **Both** — combined low-pass + VCA (the classic LPG "pluck").
+  - **VCA** — amplitude only.
+  - **Lowpass** — filter only.
+- **OS** _(switch)_ — oversampling **1× / 2× / 4×** for the delay-free solve. Higher =
+  cleaner at the cost of CPU.
+
+## Inputs & outputs
+
+| Jack | Role |
+| --- | --- |
+| **IN** | Audio in. |
+| **CV** | Control voltage — drives the vactrol (gate / envelope / pluck source). |
+| **OUT** | The gated, filtered signal. |
+
+<Tip>
+  For the classic Buchla pluck, set **MODE → Both** and feed **CV** a short trigger or
+  envelope — the vactrol's bloom does the rest.
+</Tip>
+
+## Polyphony
+
+OUT follows the channel count of the audio **IN**; each voice runs its own vactrol cell.

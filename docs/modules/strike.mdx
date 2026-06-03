@@ -1,0 +1,59 @@
+---
+title: Strike
+description: "A dual, clean, zero-bleed, envelope-driven low-pass gate."
+---
+
+**Strike** is a clean low-pass gate: a struck, percussive voice with **no tone bleeding
+through a closed gate**. It's a dual module — two identical channels (**A** / **B**),
+each polyphonic up to 16 voices — built around a shaped, dual-mode envelope rather than a
+vactrol.
+
+## Signal flow
+
+A **HIT** fires the envelope, which opens the gate and decays. Audio at **IN** passes
+through the gate to **OUT**. Because **IN is normalled to a DC level**, a HIT with nothing
+patched into IN emits the raw envelope as a **percussive ping** — Strike is a drum voice on
+its own.
+
+## Controls
+
+Per channel:
+
+- **OPEN** _(fader)_ — the gate floor: how open the gate sits at rest, before any strike.
+  Down = shut, up = open.
+- **DECAY** _(fader)_ — how long the strike rings out. Watch the **openness meter** between
+  the two faders: it fills on a HIT and **falls at the decay rate**, so short decays snap
+  down and long decays ooze down the ladder.
+- **MATERIAL** _(knob)_ — a continuous **hard → soft** morph of the struck body's character
+  (brightness and shape). The hero control.
+- **DEC** / **CTRL** _(attenuverters)_ — bipolar (±) amounts for the two CV inputs directly
+  below them. Centre = off.
+
+## Inputs & outputs
+
+| Jack | Role |
+| --- | --- |
+| **IN** | Audio in. Normalled to DC, so a HIT alone pings. |
+| **HIT** | Trigger — fires the envelope (Schmitt-triggered, so noisy gates don't chatter). |
+| **DEC** | Decay CV (scaled by the DEC attenuverter above it). |
+| **CTRL** | Pre-envelope control / level. Normalled to **+10 V** (attenuverter at 0 ⇒ no effect). |
+| **OUT** | The gated signal. |
+
+The **meter** between OPEN and DECAY shows the first voice's gate openness — your live
+window on the envelope.
+
+## Analog drift
+
+Strike's analog character — tiny per-instance tolerance and drift — is **always on**. It's
+part of the voice, not an option, so "clean" never tips into "sterile."
+
+<Note>
+  Need bit-identical, reproducible output (phase-coherent stacking, precise sound design)?
+  Right-click the module → **Deterministic (disable analog drift)**. It's persisted per
+  instance.
+</Note>
+
+## Polyphony
+
+Each channel follows the channel count of its **IN** and **HIT** — patch a poly cable and
+every voice gets its own gate. OUT is polyphonic to match.

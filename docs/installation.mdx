@@ -1,0 +1,55 @@
+---
+title: Installation
+description: "Install the S-Bank plugin in VCV Rack 2."
+---
+
+S-Bank is built for **VCV Rack 2**. It isn't in the VCV Library yet, so install it manually.
+
+## Pre-built plugin
+
+<Steps>
+  <Step title="Download">
+    Grab the `.vcvplugin` for your platform from the
+    [latest release](https://github.com/ogabrielluiz/s-bank/releases/latest):
+
+    | Platform | File |
+    | --- | --- |
+    | macOS (Apple Silicon) | `SBank-2.0.0-mac-arm64.vcvplugin` |
+    | macOS (Intel) | `SBank-2.0.0-mac-x64.vcvplugin` |
+    | Windows | `SBank-2.0.0-win-x64.vcvplugin` |
+    | Linux | `SBank-2.0.0-lin-x64.vcvplugin` |
+  </Step>
+  <Step title="Drop it in Rack's plugins folder">
+    In Rack, open **Help → Open user folder**, then move the `.vcvplugin` into the
+    `plugins/` subfolder.
+  </Step>
+  <Step title="Restart Rack">
+    Plugins load at startup. After restarting, find **S-Bank** in the module browser
+    (search `S-Bank` or a module name).
+  </Step>
+</Steps>
+
+<Note>
+  The plugin reports version `2.0.0`. In VCV Rack the major version simply marks Rack
+  compatibility — `2.x` means "for Rack 2."
+</Note>
+
+## Build from source
+
+You'll need the [VCV Rack SDK](https://vcvrack.com/manual/Building) and a C++ toolchain.
+
+```bash
+git clone https://github.com/ogabrielluiz/s-bank.git
+cd s-bank/modules/rack
+make install RACK_DIR=/path/to/Rack-SDK
+```
+
+`make install` packages a `.vcvplugin` and copies it into Rack's user plugins folder.
+
+The DSP is header-only, so the tests need no SDK at all:
+
+```bash
+modules/rack/test/run_golden.sh   # golden regression — locks the sound
+```
+
+See [Develop](/development) for the full layout.
