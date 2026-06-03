@@ -9,6 +9,9 @@ Checks:
   2. Every baked glyph, once placed, stays within sane glyph bounds (no blow-up/swap).
   3. Every generated panel SVG is valid XML, has zero <text>, and keeps all path
      coordinates within the panel rectangle (nothing spills off the panel).
+  4. The collision guardrail stays honest: it is silent on the shipping panels and
+     fires on a label dropped onto the masthead or onto a mounting screw (the class
+     of bug that shipped a garbled Vactrol masthead).
 """
 
 from __future__ import annotations
@@ -119,14 +122,41 @@ def check_svgs(res_dir: Path) -> list[str]:
     return errs
 
 
+def check_collisions() -> list[str]:
+    """The masthead/footer/screw guardrail must stay SILENT on the shipping panels
+    and FIRE on a known-bad layout. Without the second half, a refactor could quietly
+    disable the warnings and nobody would notice until a garbled panel shipped."""
+    from generate import build_strike, build_vactrol   # lazy: avoid an import cycle
+
+    errs = []
+    # 1. shipping panels must be clean (no false positives).
+    for build in (build_strike, build_vactrol):
+        p = build()
+        warns = p.collisions()
+        if warns:
+            errs.append(f"{p.module}: unexpected collision(s) {warns}")
+    # 2. a label dropped onto the masthead wordmark MUST be caught.
+    p = build_vactrol()
+    p.note(p.w / 3, 8.0, "ZZZ", "sm")                  # sits on the 'S- BANK' lockup
+    if not any("S-" in w or "BANK" in w for w in p.collisions()):
+        errs.append("guardrail missed a label overlapping the masthead")
+    # 3. a label dropped onto a mounting screw MUST be caught.
+    p = build_vactrol()
+    sx, sy, _ = p._screws()[0]                         # top-left screw centre
+    p.note(sx, sy, "ZZZ", "sm")
+    if not any("mounting screw" in w for w in p.collisions()):
+        errs.append("guardrail missed a label overlapping a mounting screw")
+    return errs
+
+
 def check_all(res_dir: Path) -> bool:
-    errs = check_transform() + check_glyphs() + check_svgs(res_dir)
+    errs = check_transform() + check_glyphs() + check_svgs(res_dir) + check_collisions()
     if errs:
         print("PANEL CHECK FAILED:", file=sys.stderr)
         for e in errs[:20]:
             print("  -", e, file=sys.stderr)
         return False
-    print("panel checks passed (transform, glyphs, SVGs)")
+    print("panel checks passed (transform, glyphs, SVGs, collisions)")
     return True
 
 
