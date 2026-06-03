@@ -41,6 +41,7 @@ struct VactrolLPG : SBankModule {
         configInput(AUDIO_INPUT, "Audio");
         configInput(CV_INPUT, "Control voltage");
         configOutput(AUDIO_OUTPUT, "Audio");
+        configBypass(AUDIO_INPUT, AUDIO_OUTPUT);  // bypass passes dry audio through
 
         float sr = APP->engine->getSampleRate();
         for (int c = 0; c < MAX_CHANNELS; c++) {
@@ -51,6 +52,13 @@ struct VactrolLPG : SBankModule {
     void onSampleRateChange(const SampleRateChangeEvent& e) override {
         for (int c = 0; c < MAX_CHANNELS; c++) {
             voices[c].setSampleRate(e.sampleRate);
+        }
+    }
+
+    void onReset(const ResetEvent& e) override {
+        Module::onReset(e);
+        for (int c = 0; c < MAX_CHANNELS; c++) {
+            voices[c].reset();
         }
     }
 

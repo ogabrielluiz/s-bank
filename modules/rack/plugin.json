@@ -1,7 +1,7 @@
 {
   "slug": "SBank",
   "name": "S-Bank",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "license": "GPL-3.0-or-later",
   "brand": "S-Bank",
   "author": "Sam-e",
@@ -17,7 +17,7 @@
       "slug": "Strike",
       "name": "Strike",
       "description": "Clean zero-bleed, envelope-driven dual low-pass gate: shaped decay, ping, memory, continuous material morph.",
-      "tags": ["Low-pass gate", "Filter", "Envelope generator", "Dual"]
+      "tags": ["Low-pass gate", "Filter", "Envelope generator", "Dual", "Polyphonic"]
     }
   ]
 }

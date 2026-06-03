@@ -29,22 +29,24 @@ def build_strike() -> Panel:
     for ch, x in enumerate(cx):
         a = "A" if ch == 0 else "B"
         po = a + "_"
-        # channel header in the outer-top corner of the bay (clears the OPEN label)
-        p.note(x - 11 if ch == 0 else x + 11, 14.6, f"CH {a}", "sm",
+        p.note(x - 11 if ch == 0 else x + 11, 15.5, f"CH {a}", "lg", color="ink",
                anchor="start" if ch == 0 else "end")
-        p.knob(x, 24, f"{po}OPEN_PARAM", "OPEN", lo="SHUT", hi="OPEN")
-        p.knob(x, 42, f"{po}DECAY_PARAM", "DECAY", lo="FAST", hi="SLOW")
-        p.knob(x, 60, f"{po}MATERIAL_PARAM", "MATERIAL", lo="HARD", hi="SOFT")
-        p.trim(x - 8.5, 73, f"{po}DECAYCV_PARAM", "DEC")
-        p.trim(x + 8.5, 73, f"{po}CTRLCV_PARAM", "CTRL")
-        p.light(x, 82, f"{po}OPEN_LIGHT")
-        p.input(x - 9, 93, f"{po}IN_INPUT", "IN")
-        p.input(x + 9, 93, f"{po}HIT_INPUT", "HIT")
-        p.input(x - 9, 105, f"{po}DECAY_INPUT", "DEC")
-        p.input(x + 9, 105, f"{po}CTRL_INPUT", "CTRL")
-        p.output(x, 117, f"{po}OUT_OUTPUT", "OUT")
-    p.note(40.64, 110.0, "IMPERF", "sm", color="eblue")
-    p.switch(40.64, 117, "IMPERFECTION_PARAM")
+        # --- control zone ---
+        # OPEN + DECAY faders, with the openness meter rising in the gap BETWEEN them: the
+        # ladder fills with gate openness and falls at the decay rate (watch it ring out).
+        p.slider(x - 7.0, 31, f"{po}OPEN_PARAM", "OPEN")
+        p.slider(x + 7.0, 31, f"{po}DECAY_PARAM", "DECAY")
+        p.meter(x, 43, f"{a}_METER_LIGHT", n=7, pitch=3.5)
+        p.knob(x, 62, f"{po}MATERIAL_PARAM", "MATERIAL", lo="HARD", hi="SOFT", prime=True)
+        # --- cable field: lifted into the freed space; 12 mm rows so each label clears
+        # the jack above it. Each CV attenuator stays directly over its CV input. ---
+        p.trim(x - 9, 78, f"{po}DECAYCV_PARAM")
+        p.trim(x + 9, 78, f"{po}CTRLCV_PARAM")
+        p.input(x - 9, 90, f"{po}DECAY_INPUT", "DEC")
+        p.input(x + 9, 90, f"{po}CTRL_INPUT", "CTRL")
+        p.input(x - 9, 102, f"{po}IN_INPUT", "IN")
+        p.input(x + 9, 102, f"{po}HIT_INPUT", "HIT")
+        p.output(x, 114, f"{po}OUT_OUTPUT", "OUT")
     return p
 
 
@@ -53,24 +55,31 @@ def build_vactrol() -> Panel:
     p = Panel(module="VactrolLPG", title="LPG", hp=6, serial="001",
               style="mk1", sub="VACTROL 292 | SINGLE VOICE")
     x = 15.24
-    p.divider(82.0)
-    p.knob(x, 20, "RESONANCE_PARAM", "RESO")
-    p.knob(x, 40, "DRIVE_PARAM", "DRIVE")
-    p.switch(x, 57, "MODE_PARAM", three=True)
-    p.note(x, 50.5, "MODE", "sm")
-    p.switch(x, 71, "OVERSAMPLE_PARAM", three=True)
-    p.note(x, 64.5, "OS", "sm")
-    p.input(x, 92, "AUDIO_INPUT", "IN")
-    p.input(x, 104, "CV_INPUT", "CV")
+    p.divider(84.0)
+    # knobs spaced so each label clears the gauge above/below it (no flip-collisions)
+    p.knob(x, 24, "RESONANCE_PARAM", "RESO")
+    p.knob(x, 44, "DRIVE_PARAM", "DRIVE")
+    p.note(x, 56.5, "MODE", "sm")
+    p.switch(x, 62, "MODE_PARAM", three=True)
+    p.note(x, 70.5, "OS", "sm")
+    p.switch(x, 76, "OVERSAMPLE_PARAM", three=True)
+    p.input(x, 93, "AUDIO_INPUT", "IN")
+    p.input(x, 105, "CV_INPUT", "CV")
     p.output(x, 117, "AUDIO_OUTPUT", "OUT")
     return p
 
 
 def main() -> None:
     RES.mkdir(parents=True, exist_ok=True)
+    collided = False
     for build in (build_strike, build_vactrol):
         p = build()
         print(f"{p.module} ({p.hp} HP, style={p.style}):")
+        # Guardrail: a label must not land on a control/jack or another label.
+        warns = p.collisions()
+        for w in warns:
+            print(f"  !! collision: {w}")
+        collided = collided or bool(warns)
         # The C++ placement is finish-independent — write it once.
         (SRC / f"{p.module}_panel.inc").write_text(p.inc())
         # Emit both finishes so the module can toggle Black/Silver at runtime.
@@ -79,9 +88,12 @@ def main() -> None:
             (RES / f"{p.module}{suffix}.svg").write_text(p.svg())
             print(f"  wrote res/{p.module}{suffix}.svg")
         print(f"  wrote src/{p.module}_panel.inc")
-    # Guardrail: fail loudly if any panel geometry is malformed (see check.py).
+    # Guardrails: fail loudly on malformed geometry (check.py) or any label collision.
     from check import check_all
-    if not check_all(RES):
+    ok = check_all(RES)
+    if collided:
+        print("FAILED: label collisions detected (see !! lines above).")
+    if not ok or collided:
         raise SystemExit(1)
 
 

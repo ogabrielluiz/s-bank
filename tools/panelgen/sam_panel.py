@@ -17,7 +17,7 @@ renders the actual Sam-e system:
       orange  = signal / active    -> OUT jacks, S- mark, status LED
       yellow  = energy / the strike -> openness LED + ringing body, HIT trigger
       cyan    = information / control -> CV trims & inputs (tied as pairs)
-      e.blue  = depth / unknown     -> the IMPERFECTION switch
+    (A three-colour signal system. Config switches stay neutral white — not a signal.)
   * Instrument language: engraved 270deg gauges round every knob, recessed wells,
     registration crosshairs, a mirror axis between channels, bracketed/boxed bays,
     masthead (S-BANK . title . HP/serial) and footer telemetry (serial . SAM-E . LED).
@@ -46,7 +46,6 @@ ENGRAVE = "#ECE7DD"  # lettering (warm white, reads engraved on black)
 ORANGE = "#FF5A00"   # signal / active / transmitting
 YELLOW = "#FFC400"   # energy / peak / the strike
 CYAN = "#19D2E5"     # information / data / flow
-EBLUE = "#1C46FF"    # depth / electricity / unknown
 HAIR = "#F5F5F1"     # structure lines, drawn at low opacity
 
 DISPLAY = "Space Grotesk, Helvetica, Arial, sans-serif"  # reference only; type is outlined
@@ -57,24 +56,26 @@ MONO = "Fira Code, 'IBM Plex Mono', monospace"
 THEMES = {
     "black": {
         "bg": ("#100b12", "#0b070b", "#08060a"),
-        "ink": "#ECE7DD", "hair": "#F5F5F1", "gray": "#A6A6A6",
+        "ink": "#ECE7DD", "hair": "#F5F5F1", "gray": "#BDBDBD",
         "well": "#14101a", "wellop": 0.9, "wellstroke": 0.16,
-        "orange": "#FF5A00", "yellow": "#FFC400", "cyan": "#19D2E5", "eblue": "#1C46FF",
+        "orange": "#FF5A00", "yellow": "#FFC400", "cyan": "#19D2E5",
     },
     "silver": {
         "bg": ("#e2e3e6", "#d2d3d7", "#bfc0c5"),
         "ink": "#17141c", "hair": "#2b2733", "gray": "#6c6d72",
         "well": "#b4b5ba", "wellop": 0.9, "wellstroke": 0.5,
-        "orange": "#E8500A", "yellow": "#A87400", "cyan": "#0E93A6", "eblue": "#1C46FF",
+        "orange": "#E8500A", "yellow": "#A87400", "cyan": "#0E93A6",
     },
 }
 
 # Component kind -> (Rack widget class, add-call, footprint_radius_mm).
 # Footprint radii match what Rack actually draws on top, so labels clear the part.
 _PARAM, _INPUT, _OUTPUT = "addParam", "addInput", "addOutput"
+SLIDER_W, SLIDER_H = 6.72, 25.93   # VCVSlider footprint (its px viewBox * 25.4/75)
 _KINDS = {
     "knob":    ("createParamCentered<RoundBlackKnob>",      _PARAM,  6.4),
     "knob_sm": ("createParamCentered<RoundSmallBlackKnob>", _PARAM,  4.6),
+    "slider":  ("createParamCentered<VCVSlider>",           _PARAM,  SLIDER_W / 2),
     "trim":    ("createParamCentered<Trimpot>",             _PARAM,  2.6),
     "switch2": ("createParamCentered<CKSS>",                _PARAM,  2.6),
     "switch3": ("createParamCentered<CKSSThree>",           _PARAM,  2.6),
@@ -82,6 +83,21 @@ _KINDS = {
     "out":     ("createOutputCentered<PJ301MPort>",         _OUTPUT, 3.15),
 }
 _SWITCH_HALF_H = 2.7  # half the CKSS body height (5.4mm tall); label clears it
+
+
+def _rect_circle_hit(box, circ, tol):
+    """True if axis-aligned box (x0,y0,x1,y1) overlaps circle (cx,cy,r) by more than tol."""
+    x0, y0, x1, y1 = box
+    cx, cy, r = circ
+    nx = min(max(cx, x0), x1)
+    ny = min(max(cy, y0), y1)
+    dx, dy = cx - nx, cy - ny
+    return r > tol and (dx * dx + dy * dy) < (r - tol) ** 2
+
+
+def _rect_rect_hit(a, b, tol):
+    return (a[0] < b[2] - tol and b[0] < a[2] - tol and
+            a[1] < b[3] - tol and b[1] < a[3] - tol)
 
 
 # --- color = state ---------------------------------------------------------------
@@ -96,11 +112,11 @@ def accent_for(c: "_Comp", t: dict) -> str:
     if c.kind == "trim":
         return t["cyan"]               # control / information
     if c.kind in ("switch2", "switch3"):
-        return t["eblue"]              # depth / the unknown
+        return t["ink"]                # mode/config selector — neutral, not a signal accent
     if c.kind == "in":
         if "HIT" in c.label.upper():
             return t["yellow"]         # the trigger that fires the strike
-        if any(k in c.label.upper() for k in ("DEC", "CTL", "CV")):
+        if any(k in c.label.upper() for k in ("DEC", "CTRL", "CV")):
             return t["cyan"]           # CV in
     return t["ink"]                    # everything else = environment
 
@@ -115,6 +131,7 @@ class _Comp:
     accent: str | None = None     # label-colour override (else color = state)
     lo: str = ""                  # scale-end descriptor at the dial min (lower-left)
     hi: str = ""                  # scale-end descriptor at the dial max (lower-right)
+    prime: bool = False           # primary control — gets a heavier gauge arc
     light_tpl: str = "MediumLight<YellowLight>"
 
 
@@ -157,14 +174,18 @@ class Panel:
         return self.hp * HP_MM
 
     # --- placement API (records a component + its label) -------------------------
-    def _add(self, kind, x, y, eid, label="", accent=None, light_tpl=None, lo="", hi=""):
+    def _add(self, kind, x, y, eid, label="", accent=None, light_tpl=None, lo="", hi="", prime=False):
         c = _Comp(kind, x, y, eid, label, accent, lo, hi)
+        c.prime = prime
         if light_tpl:
             c.light_tpl = light_tpl
         self.comps.append(c)
 
-    def knob(self, x, y, eid, label="", small=False, lo="", hi=""):
-        self._add("knob_sm" if small else "knob", x, y, eid, label, lo=lo, hi=hi)
+    def knob(self, x, y, eid, label="", small=False, lo="", hi="", prime=False):
+        self._add("knob_sm" if small else "knob", x, y, eid, label, lo=lo, hi=hi, prime=prime)
+
+    def slider(self, x, y, eid, label="", lo="", hi=""):
+        self._add("slider", x, y, eid, label, lo=lo, hi=hi)
 
     def trim(self, x, y, eid, label=""):
         self._add("trim", x, y, eid, label)
@@ -180,6 +201,13 @@ class Panel:
 
     def light(self, x, y, eid, tpl="MediumLight<YellowLight>"):
         self._add("light", x, y, eid, light_tpl=tpl)
+
+    def meter(self, x, y_bottom, base, n=5, pitch=2.6, tpl="TinyLight<YellowLight>"):
+        """A vertical LED ladder (openness meter): n segments stacked upward from
+        y_bottom. Segment index 0 is the bottom (it lights first). eids are
+        `<base> + <i>` so the C++ enum can be a 5-wide block."""
+        for i in range(n):
+            self._add("seg", x, y_bottom - i * pitch, f"{base} + {i}", light_tpl=tpl)
 
     def note(self, x, y, text, cls="sm", color="gray", anchor="middle"):
         self.notes.append((x, y, text, cls, color, anchor))
@@ -219,28 +247,30 @@ class Panel:
                 f'stroke-opacity="{op}" stroke-linecap="round"/>')
 
     # --- composite motifs --------------------------------------------------------
-    def _gauge(self, cx, cy, r, op, thin, caps=True):
-        """270deg instrument dial: guard ring + graduated ticks + top index + min/max caps."""
+    def _gauge(self, cx, cy, r, op, thin, caps=True, prime=False):
+        """270deg instrument dial: a single graduated arc + sparse ticks + top index.
+        Deliberately quiet — one concentric layer, 5 marks. A ``prime`` control gets a
+        heavier arc so it reads as primary instead of competing with its neighbours."""
         hair = self._t["hair"]
         a0, sweep = 135, 270
-        out = [self._arc(cx, cy, r + 1.0, a0, 45, 1, 1, hair, 0.16, op * 0.5),
-               self._arc(cx, cy, r, a0, 45, 1, 1, hair, 0.18 if thin else 0.22, op)]
-        n = 10
+        arc_w = 0.16 if thin else (0.36 if prime else 0.18)
+        out = [self._arc(cx, cy, r, a0, 45, 1, 1, hair, arc_w, op + (0.22 if prime else 0.0))]
+        n = 4                                     # 5 marks: ends + centre + the two quarters
         for i in range(n + 1):
             a = a0 + (i / n) * sweep
-            major = (i % 5 == 0)
-            ri, ro = r - (1.4 if major else 0.7), r + 0.12
+            major = (i % 2 == 0)                  # ends + centre are major
+            ri, ro = r - (1.2 if major else 0.6), r + 0.1
             x0, y0 = self._polar(cx, cy, ri, a)
             x1, y1 = self._polar(cx, cy, ro, a)
-            out.append(self._line(x0, y0, x1, y1, hair, 0.26 if major else 0.15,
-                                   op + (0.18 if major else 0.04)))
-        ti = self._polar(cx, cy, r - 2.1, 270)   # top index pointer (12 o'clock)
-        tb = self._polar(cx, cy, r + 0.7, 270)
-        out.append(self._line(ti[0], ti[1], tb[0], tb[1], hair, 0.3, op + 0.32))
+            out.append(self._line(x0, y0, x1, y1, hair, 0.2 if major else 0.12,
+                                   op + (0.1 if major else 0.0)))
+        ti = self._polar(cx, cy, r - 1.9, 270)    # top index pointer (12 o'clock)
+        tb = self._polar(cx, cy, r + 0.6, 270)
+        out.append(self._line(ti[0], ti[1], tb[0], tb[1], hair, 0.28, op + 0.3))
         if caps:                                  # min/max caps — skipped when lo/hi text marks the ends
             for ea in (a0, 45):
                 ex, ey = self._polar(cx, cy, r, ea)
-                out.append(self._circle(ex, ey, 0.45, fill=hair, fill_op=op + 0.25))
+                out.append(self._circle(ex, ey, 0.4, fill=hair, fill_op=op + 0.2))
         return "".join(out)
 
     def _well(self, cx, cy, r):
@@ -249,13 +279,11 @@ class Panel:
                             stroke=t["hair"], w=0.2, op=t["wellstroke"])
 
     def _ping(self, cx, cy, scale):
-        """Concentric pulses — the struck resonant body ringing out."""
+        """The openness indicator — one ring + the lit core. Yellow = the strike, so it
+        reads clearly (it's the module's identity state), while staying a single ring."""
         yellow = self._t["yellow"]
-        out = []
-        for rr, op in ((2.3, 0.5), (3.9, 0.3), (5.3, 0.17)):
-            out.append(self._circle(cx, cy, rr * scale, stroke=yellow, w=0.22, op=op))
-        out.append(self._circle(cx, cy, 1.25, fill=yellow, fill_op=0.85))
-        return "".join(out)
+        return (self._circle(cx, cy, 2.8 * scale, stroke=yellow, w=0.26, op=0.5)
+                + self._circle(cx, cy, 1.2, fill=yellow, fill_op=0.95))
 
     def _brackets(self, x0, y0, x1, y1, op, length=2.4):
         hair = self._t["hair"]
@@ -280,7 +308,7 @@ class Panel:
         t = THEMES.get(self.finish, THEMES["black"])
         self._t = t                       # helpers read the active finish from here
         ink, hair, gray = t["ink"], t["hair"], t["gray"]
-        orange, yellow, cyan, eblue = t["orange"], t["yellow"], t["cyan"], t["eblue"]
+        orange, yellow, cyan = t["orange"], t["yellow"], t["cyan"]
         w, H, mid = self.w, PANEL_H, self.w / 2
         mx = 5 if w < 50 else 7          # side margin (body)
         smx = 11.5                       # corner-row margin: clears the Rack screws
@@ -313,16 +341,23 @@ class Panel:
             o.append(self._line(mid, 15.5, mid, 102, hair, 0.18, 0.16))
             for ry in range(20, 101, 10):
                 o.append(self._line(mid - 0.7, ry, mid + 0.7, ry, hair, 0.18, 0.16))
-            dy = 58
-            o.append(f'<path d="M{mid:.2f},{dy - 1.1:.2f} L{mid + 1.1:.2f},{dy:.2f} '
-                     f'L{mid:.2f},{dy + 1.1:.2f} L{mid - 1.1:.2f},{dy:.2f} Z" fill="none" '
-                     f'stroke="{hair}" stroke-width="0.18" stroke-opacity="0.22"/>')
+            # a small registration dot — not a diamond (which read as a central function)
+            o.append(self._circle(mid, 58, 0.5, fill=hair, fill_op=0.2))
         if S.zones == "boxes":
             for cx in cols:
                 o.append(self._rrect(cx - 11, 15.5, 22, 105.5, 1.4, stroke=hair, sw=0.2, op=0.13))
         elif S.zones == "brackets":
+            sliders = [c for c in self.comps if c.kind == "slider"]
             for cx in cols:
-                o.append(self._brackets(cx - 11, 15.5, cx + 11, 121, 0.3))
+                grp = [c for c in sliders if abs(c.x - cx) <= 8]
+                if grp:                       # frame just the fader pair — the "envelope" group
+                    x0 = min(c.x for c in grp) - SLIDER_W / 2 - 1.6
+                    x1 = max(c.x for c in grp) + SLIDER_W / 2 + 1.6
+                    y0 = min(c.y for c in grp) - SLIDER_H / 2 - 1.6
+                    y1 = max(c.y for c in grp) + SLIDER_H / 2 + 5.6
+                    o.append(self._brackets(x0, y0, x1, y1, 0.42, length=2.8))
+                else:
+                    o.append(self._brackets(cx - 11, 15.5, cx + 11, 121, 0.3))
 
         # 3. masthead (width-aware) — wordmark + title in the display face. Corner
         # text uses smx so it clears the mounting screws.
@@ -361,13 +396,15 @@ class Panel:
             wm = text_paths("S-", mid, 78, 26, ink, "middle", display=True)
             o.append(wm.replace("/>", ' fill-opacity="0.05"/>'))
 
-        # 5. CV grouping ties (cyan) for DEC/CTL trim pairs
+        # 5. CV grouping: each attenuverter links DOWN to the CV input it scales, so the
+        # relationship reads at a glance (no floating "CV" that looks like a third control).
         trims = [c for c in self.comps if c.kind == "trim"]
-        for cx in cols:
-            pair = [tt for tt in trims if abs(tt.y - 73) < 1 and abs(tt.x - cx) <= 9]
-            if len(pair) == 2:
-                o.append(self._line(pair[0].x, pair[0].y, pair[1].x, pair[1].y, cyan, 0.18, 0.32))
-                o.append(text_paths("CV", cx, 69.4, 1.4, cyan, "middle", weight=0.16))
+        ins = [c for c in self.comps if c.kind == "in"]
+        for tr in trims:
+            below = [j for j in ins if abs(j.x - tr.x) < 0.6 and 0 < (j.y - tr.y) < 16]
+            if below:
+                j = min(below, key=lambda j: j.y)
+                o.append(self._line(tr.x, tr.y + 2.4, j.x, j.y - 3.4, cyan, 0.18, 0.4))
 
         # 6. per-component furniture: wells, gauges, ping, accent rings
         for c in self.comps:
@@ -375,16 +412,43 @@ class Panel:
             if c.kind in ("knob", "knob_sm"):
                 fr = _KINDS[c.kind][2]
                 o.append(self._well(c.x, c.y, fr - 0.6))
-                o.append(self._gauge(c.x, c.y, fr + 0.9, 0.28, S.gauges_thin, caps=not (c.lo or c.hi)))
+                o.append(self._gauge(c.x, c.y, fr + 0.9, 0.28, S.gauges_thin,
+                                     caps=not (c.lo or c.hi), prime=c.prime))
+                if c.prime:                      # hero knob — a faint halo the faders lack
+                    o.append(self._circle(c.x, c.y, fr + 1.9, stroke=hair, w=0.3, op=0.4))
                 if c.lo or c.hi:                 # scale-end descriptors just outside the arc ends
                     capr = (fr + 0.9) * 0.707
                     ex, ey = capr + 0.4, c.y + capr + 1.2
                     if c.lo:
-                        o.append(text_paths(c.lo, c.x - ex, ey, 1.1, gray, "end", weight=0.15))
+                        o.append(text_paths(c.lo, c.x - ex, ey, 1.3, gray, "end", weight=0.15))
                     if c.hi:
-                        o.append(text_paths(c.hi, c.x + ex, ey, 1.1, gray, "start", weight=0.15))
+                        o.append(text_paths(c.hi, c.x + ex, ey, 1.3, gray, "start", weight=0.15))
+            elif c.kind == "slider":
+                # Recessed engraved channel; VCVSlider draws the track + cap on top, so a
+                # thin rim of well shows around it.
+                o.append(self._rrect(c.x - SLIDER_W / 2 - 0.6, c.y - SLIDER_H / 2 - 0.6,
+                                     SLIDER_W + 1.2, SLIDER_H + 1.2, 1.3,
+                                     fill=t["well"], fill_op=t["wellop"],
+                                     stroke=hair, sw=0.2, op=t["wellstroke"]))
+                # graduated travel scale flanking the fader (like a mixer fader): 9 marks,
+                # majors at the ends + centre. Faint — reads as a scale, not a tick ring.
+                h2 = SLIDER_H / 2 - 1.6
+                n = 8
+                for i in range(n + 1):
+                    yy = c.y - h2 + (i / n) * (2 * h2)
+                    major = (i % 4 == 0)
+                    ln = 1.5 if major else 0.9
+                    for s in (-1, 1):
+                        x0 = c.x + s * (SLIDER_W / 2 + 0.5)
+                        o.append(self._line(x0, yy, x0 + s * ln, yy, hair,
+                                            0.18 if major else 0.12, 0.4 if major else 0.22))
             elif c.kind == "trim":
-                o.append(self._well(c.x, c.y, _KINDS[c.kind][2] + 0.5))
+                fr = _KINDS[c.kind][2]
+                o.append(self._well(c.x, c.y, fr + 0.3))
+                if acc != ink:            # subordinate cyan ring — the CV JACK below owns the bold ring
+                    o.append(self._circle(c.x, c.y, fr + 0.5, stroke=acc, w=0.16, op=0.3))
+                # 12-o'clock detent mark — signals a bipolar (±) attenuverter, centre = off
+                o.append(self._line(c.x, c.y - fr - 0.4, c.x, c.y - fr - 1.3, hair, 0.2, 0.55))
             elif c.kind in ("in", "out"):
                 fr = _KINDS[c.kind][2]
                 o.append(self._well(c.x, c.y, fr + 0.5))
@@ -394,27 +458,28 @@ class Panel:
                     o.append(self._circle(c.x, c.y, fr + 0.7, stroke=acc, w=0.22, op=0.4))
             elif c.kind == "light":
                 o.append(self._ping(c.x, c.y, S.ping))
+            elif c.kind == "seg":     # openness-meter segment: small recessed LED well
+                o.append(self._circle(c.x, c.y, 1.45, fill=t["well"], fill_op=t["wellop"],
+                                      stroke=hair, w=0.16, op=t["wellstroke"]))
             elif c.kind in ("switch2", "switch3"):
                 o.append(self._rrect(c.x - 1.3, c.y - _SWITCH_HALF_H, 2.6, _SWITCH_HALF_H * 2, 0.8,
-                                     fill=t["well"], fill_op=t["wellop"], stroke=eblue, sw=0.22, op=0.5))
+                                     fill=t["well"], fill_op=t["wellop"], stroke=ink, sw=0.22, op=0.5))
                 for dx, dy, op in ((-3.2, -1.0, 0.7), (-3.7, 0.8, 0.5), (3.4, 0.4, 0.6)):
-                    o.append(self._circle(c.x + dx, c.y + dy, 0.26, fill=eblue, fill_op=op))
+                    o.append(self._circle(c.x + dx, c.y + dy, 0.26, fill=ink, fill_op=op))
 
-        # 7. labels (above by default; flip below if they'd hit the masthead)
+        # 7. labels — placement via _label_place (shared with the collision guardrail)
         for c in self.comps:
             if not c.label:
                 continue
             acc = accent_for(c, t)
-            size = 1.9 if c.kind in ("knob", "knob_sm") else 1.6
-            fpr = _SWITCH_HALF_H if c.kind in ("switch2", "switch3") else _KINDS[c.kind][2]
-            ly = c.y - fpr - 1.4
-            if ly < 14.5:                       # too close to masthead -> label below
-                ly = c.y + fpr + 2.6
+            size, ly = self._label_place(c)
             o.append(text_paths(c.label, c.x, ly, size, acc, "middle", weight=0.18))
 
-        # 8. free notes (col may be a theme key like "gray"/"eblue", or a literal colour)
+        # 8. free notes (col may be a theme key like "gray"/"cyan", or a literal colour)
         for (x, y, text, _cls, col, anchor) in self.notes:
-            o.append(text_paths(text, x, y, 1.6, t.get(col, col), anchor, weight=0.16))
+            sz = 2.4 if _cls == "lg" else 1.6   # "lg" = structural header (e.g. CH A/B)
+            o.append(text_paths(text, x, y, sz, t.get(col, col), anchor,
+                                weight=0.2 if _cls == "lg" else 0.16))
 
         # 9. footer telemetry (width-aware)
         o.append(self._line(mx, H - 6.2, w - mx, H - 6.2, hair, 0.25, 0.34))
@@ -427,7 +492,8 @@ class Panel:
             o.append(text_paths(f"S- {self.hp}HP", smx, fb, 1.45, gray, "start", weight=0.16))
             o.append(text_paths("SAM-E", mid, fb, 1.6, ink, "middle", display=True))
             sw = text_width("SIGNAL STABLE", 1.4)
-            o.append(self._circle(w - smx - sw - 2.0, fb - 0.55, 0.85, fill=orange, fill_op=0.95))
+            # neutral status dot — orange is reserved for OUT/identity, not decorative telemetry
+            o.append(self._circle(w - smx - sw - 2.0, fb - 0.55, 0.7, fill=gray, fill_op=0.7))
             o.append(text_paths("SIGNAL STABLE", w - smx, fb, 1.4, gray, "end", weight=0.16))
 
         o.append("</svg>")
@@ -443,12 +509,92 @@ class Panel:
         for c in self.comps:
             v = f"mm2px(Vec({c.x:.3f}f, {c.y:.3f}f))"
             eid = f"{self.module}::{c.eid}"
-            if c.kind == "light":
+            if c.kind in ("light", "seg"):
                 lines.append(f"addChild(createLightCentered<{c.light_tpl}>({v}, module, {eid}));")
             else:
                 ctor, add, _ = _KINDS[c.kind]
                 lines.append(f"{add}({ctor}({v}, module, {eid}));")
         return "\n".join(lines) + "\n"
+
+    # --- label placement: single source of truth for svg() AND collisions() ------
+    def _label_place(self, c):
+        """(size_mm, baseline_y) for a component's main label."""
+        if c.kind == "slider":                   # name sits clearly below the fader well
+            return 1.8, c.y + SLIDER_H / 2 + 3.8
+        if c.kind in ("knob", "knob_sm"):
+            size = 2.3 if c.prime else 1.9
+            fpr = _KINDS[c.kind][2] + (1.9 if c.prime else 0.9)   # clear the gauge / prime halo
+        elif c.kind in ("switch2", "switch3"):
+            size, fpr = 1.6, _SWITCH_HALF_H
+        else:
+            size, fpr = 1.6, _KINDS[c.kind][2]
+        ly = c.y - fpr - 1.4
+        if ly < 14.5:                            # too close to masthead -> flip below
+            ly = c.y + fpr + 2.6
+        return size, ly
+
+    # --- collision guardrail: warn when a label overlaps furniture or another label
+    def _footprint(self, c):
+        """Bounding circle (cx, cy, r) of a component's drawn furniture, or None."""
+        if c.kind in ("knob", "knob_sm"):
+            return (c.x, c.y, _KINDS[c.kind][2] + (1.9 if c.prime else 0.9))
+        if c.kind == "trim":
+            return (c.x, c.y, _KINDS[c.kind][2] + 0.8)
+        if c.kind in ("in", "out"):
+            return (c.x, c.y, _KINDS[c.kind][2] + 0.9)
+        if c.kind == "light":
+            return (c.x, c.y, 2.8 * STYLES.get(self.style, STYLES["mk1"]).ping)
+        if c.kind == "seg":
+            return (c.x, c.y, 1.6)
+        return None
+
+    def _footprint_rect(self, c):
+        if c.kind == "slider":
+            return (c.x - SLIDER_W / 2 - 0.6, c.y - SLIDER_H / 2 - 0.6,
+                    c.x + SLIDER_W / 2 + 0.6, c.y + SLIDER_H / 2 + 0.6)
+        if c.kind in ("switch2", "switch3"):
+            return (c.x - 1.6, c.y - _SWITCH_HALF_H, c.x + 1.6, c.y + _SWITCH_HALF_H)
+        return None
+
+    def _label_box(self, c):
+        if not c.label:
+            return None
+        size, ly = self._label_place(c)
+        w = text_width(c.label, size)
+        x0 = c.x - w / 2.0                        # component labels are middle-anchored
+        return (x0, ly - size, x0 + w, ly + 0.12 * size)
+
+    def collisions(self, clearance=1.0):
+        """Human-readable warnings where a text label overlaps OR comes within
+        `clearance` mm of a component footprint or another label. Catches crowding,
+        not just hard overlaps. Used as a generate-time guardrail."""
+        near = -clearance   # expand shapes -> flag near-misses (gap < clearance)
+        # items: (owner_comp_or_None, name, box). A label is placed adjacent to its OWN
+        # control by design, so against its owner we only flag a real OVERLAP, not nearness.
+        items = []
+        for c in self.comps:
+            b = self._label_box(c)
+            if b:
+                items.append((c, c.label, b))
+        for (x, y, text, cls, _col, anchor) in self.notes:
+            sz = 2.4 if cls == "lg" else 1.6
+            w = text_width(text, sz)
+            x0 = x if anchor == "start" else (x - w if anchor == "end" else x - w / 2.0)
+            items.append((None, text, (x0, y - sz, x0 + w, y + 0.12 * sz)))
+        warns = []
+        for owner, name, box in items:
+            for c in self.comps:
+                t = 0.25 if c is owner else near   # own control: overlap only; others: clearance
+                circ, rect = self._footprint(c), self._footprint_rect(c)
+                if (circ and _rect_circle_hit(box, circ, t)) or \
+                   (rect and _rect_rect_hit(box, rect, t)):
+                    how = "overlaps" if c is owner else "too close to"
+                    warns.append(f"label '{name}' {how} {c.kind} {c.eid} @ ({c.x:.1f},{c.y:.1f})")
+        for i in range(len(items)):
+            for j in range(i + 1, len(items)):
+                if _rect_rect_hit(items[i][2], items[j][2], near):
+                    warns.append(f"labels '{items[i][1]}' / '{items[j][1]}' too close")
+        return warns
 
     def write(self, svg_path: str | Path, inc_path: str | Path):
         Path(svg_path).write_text(self.svg())
