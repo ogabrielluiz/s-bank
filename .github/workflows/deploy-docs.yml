@@ -27,7 +27,8 @@ jobs:
       - name: Build Astro Starlight site
         uses: withastro/action@v3
         with:
-          path: docs   # the Astro project lives in docs/
+          path: docs          # the Astro project lives in docs/
+          node-version: 22     # Astro 6 requires Node >= 22.12 (action defaults to 20)
 
   deploy:
     needs: build
