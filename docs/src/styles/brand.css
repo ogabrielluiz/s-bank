@@ -10,3 +10,26 @@
   --sl-color-accent: #e8500a;
   --sl-color-accent-high: #5e1f00;
 }
+
+/* --- Generated panel art on module pages ---------------------------------- */
+/* The SVG is the module's real, source-of-truth faceplate (tools/panelgen).  */
+.panel-figure {
+  margin: 1.75rem 0 2.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.panel-art {
+  width: auto;
+  height: auto;
+  max-height: 30rem;
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 10px 34px -14px rgb(0 0 0 / 0.55);
+}
+.panel-figure figcaption {
+  margin-top: 0.65rem;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}

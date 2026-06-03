@@ -19,6 +19,9 @@ from sam_panel import Panel
 RACK = Path(__file__).resolve().parents[2] / "modules" / "rack"
 RES = RACK / "res"
 SRC = RACK / "src"
+# The docs site embeds the same generated panel art; emit copies here so the
+# existing "panels out of sync" CI guard covers the docs too (never hand-copied).
+DOCS_PANELS = Path(__file__).resolve().parents[2] / "docs" / "public" / "panels"
 
 
 def build_strike() -> Panel:
@@ -71,6 +74,7 @@ def build_vactrol() -> Panel:
 
 def main() -> None:
     RES.mkdir(parents=True, exist_ok=True)
+    DOCS_PANELS.mkdir(parents=True, exist_ok=True)
     collided = False
     for build in (build_strike, build_vactrol):
         p = build()
@@ -82,11 +86,15 @@ def main() -> None:
         collided = collided or bool(warns)
         # The C++ placement is finish-independent — write it once.
         (SRC / f"{p.module}_panel.inc").write_text(p.inc())
-        # Emit both finishes so the module can toggle Black/Silver at runtime.
+        # Emit both finishes so the module can toggle Black/Silver at runtime. The
+        # docs embed only the default (black) finish, so copy just that one.
         for fin, suffix in (("black", ""), ("silver", "-silver")):
             p.finish = fin
-            (RES / f"{p.module}{suffix}.svg").write_text(p.svg())
-            print(f"  wrote res/{p.module}{suffix}.svg")
+            svg = p.svg()
+            (RES / f"{p.module}{suffix}.svg").write_text(svg)
+            if fin == "black":
+                (DOCS_PANELS / f"{p.module}.svg").write_text(svg)
+            print(f"  wrote res/{p.module}{suffix}.svg" + ("  (+ docs copy)" if fin == "black" else ""))
         print(f"  wrote src/{p.module}_panel.inc")
     # Guardrails: fail loudly on malformed geometry (check.py) or any label collision.
     from check import check_all
