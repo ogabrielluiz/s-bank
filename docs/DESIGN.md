@@ -5,6 +5,24 @@ gate. The DSP is header-only C++ (`modules/rack/src/dsp/SBankDSP.hpp`,
 `sbank::VactrolLpg`) with **no VCV Rack SDK dependency**, so it tests and runs
 headless; the Rack module owns the core directly.
 
+## Including / vendoring the DSP
+
+The canonical, stable include path is:
+
+```cpp
+#include <sbank/sbank_dsp.hpp>
+```
+
+`include/sbank/sbank_dsp.hpp` is a thin forwarding header that includes the real
+implementation at `modules/rack/src/dsp/SBankDSP.hpp` (the real file stays put so
+the Rack build's include path keeps working). To **vendor** the library into
+another project, copy the header (`SBankDSP.hpp`, and optionally the forwarding
+header) into your tree and add its directory to your compiler's include path
+(`-I`); nothing else is required. The header is std-only C++11 with no VCV Rack
+SDK dependency, so it compiles and tests headless. `SBANK_DSP_VERSION_MAJOR/
+_MINOR/_PATCH` (and the combined `SBANK_DSP_VERSION`) let vendored copies branch
+on the library version.
+
 ## Architecture (per sample)
 
 ```
